@@ -1,6 +1,6 @@
 # ApexTopology
 
-**AI-Powered Nokia SR OS Configuration Generator for ContainerLab**
+** Nokia SR OS Configuration Generator for ContainerLab**
 
 Version: 0.2.0
 
