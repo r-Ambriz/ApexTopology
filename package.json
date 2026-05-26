@@ -1,0 +1,18 @@
+{
+  "name": "apextopology",
+  "version": "0.2.0",
+  "description": "Nokia SR OS configuration template generator for Containerlab",
+  "private": true,
+  "scripts": {
+    "build": "echo \"Static app - no build step required\"",
+    "start": "python3 -m http.server 3000"
+  },
+  "keywords": [
+    "nokia",
+    "sr-os",
+    "containerlab",
+    "network",
+    "configuration"
+  ],
+  "license": "MIT"
+}

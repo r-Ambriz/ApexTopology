@@ -1,0 +1,1031 @@
+{
+  "source": {
+    "title": "SR-SIM Installation, Setup, and Deployment Guide",
+    "release": "25.10.R1",
+    "appendix": "Appendix A: SR-SIM supported hardware",
+    "url": "https://documentation.nokia.com/sr/25-10/7750-sr/pdf/SR-SIM_Installation_and_Setup_Guide_25.10.R1.pdf"
+  },
+  "chassis": {
+    "IXR-6": {
+      "sfmCpmTypes": [
+        "None",
+        "cpm-ixr",
+        "sfm-ixr-6"
+      ],
+      "iomCardTypes": [
+        "None",
+        "imm36-100g-qsfp28",
+        "imm48-sfp+2-qsfp28"
+      ],
+      "mdaTypes": [
+        "None",
+        "m36-100g-qsfp28",
+        "m48-sfp+2-qsfp28"
+      ]
+    },
+    "IXR-10": {
+      "sfmCpmTypes": [
+        "None",
+        "cpm-ixr",
+        "sfm-ixr-10"
+      ],
+      "iomCardTypes": [
+        "None",
+        "imm36-100g-qsfp28",
+        "imm48-sfp+2-qsfp28"
+      ],
+      "mdaTypes": [
+        "None",
+        "m36-100g-qsfp28",
+        "m48-sfp+2-qsfp28"
+      ]
+    },
+    "IXR-e": {
+      "sfmCpmTypes": [
+        "None",
+        "cpm-ixr-e-gnss/imm14-10g-sfp++4-1g-tx",
+        "cpm-ixr-e-gnss/imm24-sfp++8-sfp28+2-qsfp28",
+        "cpm-ixr-e/imm14-10g-sfp++4-1g-tx",
+        "cpm-ixr-e/imm24-sfp++8-sfp28+2-qsfp28"
+      ],
+      "iomCardTypes": [
+        "None",
+        "cpm-ixr-e-gnss/imm14-10g-sfp++4-1g-tx",
+        "cpm-ixr-e-gnss/imm24-sfp++8-sfp28+2-qsfp28",
+        "cpm-ixr-e/imm14-10g-sfp++4-1g-tx",
+        "cpm-ixr-e/imm24-sfp++8-sfp28+2-qsfp28"
+      ],
+      "mdaTypes": [
+        "None",
+        "m14-10g-sfp++4-1g-tx",
+        "m24-sfp++8-sfp28+2-qsfp28"
+      ]
+    },
+    "IXR-e2": {
+      "sfmCpmTypes": [
+        "None",
+        "cpm-ixr-e2"
+      ],
+      "iomCardTypes": [
+        "None"
+      ],
+      "mdaTypes": [
+        "None",
+        "m2-qsfpdd+2-qsfp28+24-sfp28"
+      ]
+    },
+    "IXR-e2c": {
+      "sfmCpmTypes": [
+        "None",
+        "cpm-ixr-e2c"
+      ],
+      "iomCardTypes": [
+        "None"
+      ],
+      "mdaTypes": [
+        "None",
+        "m12-sfp28+2-qsfp28"
+      ]
+    },
+    "IXR-ec": {
+      "sfmCpmTypes": [
+        "None",
+        "cpm-ixr-ec"
+      ],
+      "iomCardTypes": [
+        "None"
+      ],
+      "mdaTypes": [
+        "None",
+        "m4-1g-tx+20-1g-sfp+6-10g-sfp+"
+      ]
+    },
+    "IXR-R4": {
+      "sfmCpmTypes": [
+        "None",
+        "cpm-ixr-r4"
+      ],
+      "iomCardTypes": [
+        "None",
+        "iom-ixr-r4"
+      ],
+      "mdaTypes": [
+        "None",
+        "m10-10g-sfp+",
+        "m10-1g-sfp+2-10g-sfp+",
+        "m20-1g-csfp",
+        "m4-10g-sfp++1-100g-cfp2",
+        "m6-10g-sfp++1-100g-qsfp28",
+        "m6-10g-sfp++4-25g-sfp28"
+      ]
+    },
+    "IXR-R6": {
+      "sfmCpmTypes": [
+        "None",
+        "cpiom-ixr-r6"
+      ],
+      "iomCardTypes": [
+        "None",
+        "cpiom-ixr-r6"
+      ],
+      "mdaTypes": [
+        "None",
+        "a32-chds1v2",
+        "m10-10g-sfp+",
+        "m10-50g-sfp56",
+        "m2-100g-qsfp28+16-10g-sfp+",
+        "m20-1g-csfp",
+        "m32-1g-csfp",
+        "m4-10g-sfp++1-100g-cfp2",
+        "m6-10g-sfp++1-100g-qsfp28",
+        "m6-10g-sfp++4-25g-sfp28"
+      ]
+    },
+    "IXR-R6dl": {
+      "sfmCpmTypes": [
+        "None",
+        "cpm-ixr-r6d/iom-ixr-r6d"
+      ],
+      "iomCardTypes": [
+        "None",
+        "cpm-ixr-r6d/iom-ixr-r6d"
+      ],
+      "mdaTypes": [
+        "None",
+        "m1-400g-qsfpdd+1-100g-qsfp28",
+        "m10-50g-sfp56",
+        "m18-25g-sfp28",
+        "m2-100g-qsfp28+16-10g-sfp+",
+        "m2-cfp2",
+        "m20-10g-sfp+",
+        "m32-1g-csfp",
+        "m46-10g-sfp+",
+        "m5-100g-qsfp28",
+        "m80-1g-csfp"
+      ]
+    },
+    "IXR-s": {
+      "sfmCpmTypes": [
+        "None",
+        "cpm-ixr-s/imm48-sfp++6-qsfp28"
+      ],
+      "iomCardTypes": [
+        "None",
+        "cpm-ixr-s/imm48-sfp++6-qsfp28"
+      ],
+      "mdaTypes": [
+        "None",
+        "m48-sfp++6-qsfp28"
+      ]
+    },
+    "IXR-X": {
+      "sfmCpmTypes": [
+        "None",
+        "cpm-ixr-x/imm32-qsfp28+4-qsfpdd",
+        "cpm-ixr-x/imm6-qsfpdd+48-sfp56"
+      ],
+      "iomCardTypes": [
+        "None",
+        "cpm-ixr-x/imm32-qsfp28+4-qsfpdd",
+        "cpm-ixr-x/imm6-qsfpdd+48-sfp56"
+      ],
+      "mdaTypes": [
+        "None",
+        "m32-qsfp28+4-qsfpdd",
+        "m6-qsfpdd+48-sfp56"
+      ]
+    },
+    "IXR-X3": {
+      "sfmCpmTypes": [
+        "None",
+        "cpm-ixr-x/imm36-qsfpdd"
+      ],
+      "iomCardTypes": [
+        "None",
+        "cpm-ixr-x/imm36-qsfpdd"
+      ],
+      "mdaTypes": [
+        "None",
+        "m36-qsfpdd"
+      ]
+    },
+    "ESS-7": {
+      "sfmCpmTypes": [
+        "None",
+        "cpm5",
+        "m-sfm6-7/12"
+      ],
+      "iomCardTypes": [
+        "None",
+        "iom5-e"
+      ],
+      "mdaTypes": [
+        "None",
+        "me6-100gb-qsfp28"
+      ]
+    },
+    "ESS-12": {
+      "sfmCpmTypes": [
+        "None",
+        "cpm5",
+        "m-sfm6-7/12"
+      ],
+      "iomCardTypes": [
+        "None",
+        "iom5-e"
+      ],
+      "mdaTypes": [
+        "None",
+        "me6-100gb-qsfp28"
+      ]
+    },
+    "SAR-Hm": {
+      "sfmCpmTypes": [
+        "None",
+        "cpm-sar-hm"
+      ],
+      "iomCardTypes": [
+        "None"
+      ],
+      "mdaTypes": [
+        "None",
+        "i1-wlan",
+        "i2-cellular",
+        "i2-sdi",
+        "i6-10/100eth-tx",
+        "isa-ms-v"
+      ]
+    },
+    "SAR-Hmc": {
+      "sfmCpmTypes": [
+        "None",
+        "cpm-sar-hmc"
+      ],
+      "iomCardTypes": [
+        "None"
+      ],
+      "mdaTypes": [
+        "None",
+        "i2-cellular",
+        "i2-sdi",
+        "i3-10/100eth-tx",
+        "isa-ms-v"
+      ]
+    },
+    "SAR-1": {
+      "sfmCpmTypes": [
+        "None"
+      ],
+      "iomCardTypes": [
+        "None",
+        "iom-sar"
+      ],
+      "mdaTypes": [
+        "None",
+        "isa-ms-v",
+        "m10-sfp++6-sfp"
+      ]
+    },
+    "DMS-1-24D": {
+      "sfmCpmTypes": [
+        "None",
+        "cpm-1x/dms24-800g-qsfpdd-1"
+      ],
+      "iomCardTypes": [
+        "None",
+        "cpm-1x/dms24-800g-qsfpdd-1"
+      ],
+      "mdaTypes": [
+        "None",
+        "d24-800g-qsfpdd-1"
+      ]
+    },
+    "SR-1": {
+      "sfmCpmTypes": [
+        "None",
+        "cpm-1"
+      ],
+      "iomCardTypes": [
+        "None"
+      ],
+      "mdaTypes": [
+        "None",
+        "me12-100gb-qsfp28",
+        "me16-25gb-sfp28+2-100gb-qsfp-b",
+        "me16-25gb-sfp28+2-100gb-qsfp28",
+        "me3-200gb-cfp2-dco",
+        "me3-400gb-qsfpdd",
+        "me6-100gb-qsfp28",
+        "me6-400gb-qsfpdd"
+      ]
+    },
+    "SR-1-24D": {
+      "sfmCpmTypes": [
+        "None",
+        "cpm-1x/i24-800g-qsfpdd-1"
+      ],
+      "iomCardTypes": [
+        "None",
+        "cpm-1x/i24-800g-qsfpdd-1"
+      ],
+      "mdaTypes": [
+        "None",
+        "m24-800g-qsfpdd-1"
+      ]
+    },
+    "SR-1-46S": {
+      "sfmCpmTypes": [
+        "None",
+        "cpm-1x/i40-200g-sfpdd+6-800g-qsfpdd-1"
+      ],
+      "iomCardTypes": [
+        "None",
+        "cpm-1x/i40-200g-sfpdd+6-800g-qsfpdd-1"
+      ],
+      "mdaTypes": [
+        "None",
+        "m40-200g-sfpdd+6-800g-qsfpdd-1"
+      ]
+    },
+    "SR-1-48D": {
+      "sfmCpmTypes": [
+        "None",
+        "cpm-1x/i48-400g-qsfpdd-1"
+      ],
+      "iomCardTypes": [
+        "None",
+        "cpm-1x/i48-400g-qsfpdd-1"
+      ],
+      "mdaTypes": [
+        "None",
+        "m48-400g-qsfpdd-1"
+      ]
+    },
+    "SR-1-92S": {
+      "sfmCpmTypes": [
+        "None",
+        "cpm-1x/i80-200g-sfpdd+12-400g-qsfpdd-1"
+      ],
+      "iomCardTypes": [
+        "None",
+        "cpm-1x/i80-200g-sfpdd+12-400g-qsfpdd-1"
+      ],
+      "mdaTypes": [
+        "None",
+        "m80-200g-sfpdd+12-400g-qsfpdd-"
+      ]
+    },
+    "SR-1eSR-2eSR-3e": {
+      "sfmCpmTypes": [
+        "None",
+        "cpm-e"
+      ],
+      "iomCardTypes": [
+        "None",
+        "iom-e"
+      ],
+      "mdaTypes": [
+        "None",
+        "isa2-aa",
+        "isa2-bb",
+        "isa2-tunnel",
+        "me1-100gb-cfp2",
+        "me10-10gb-sfp+",
+        "me12-10/1gb-sfp+",
+        "me2-100gb-cfp4",
+        "me2-100gb-ms-qsfp28",
+        "me2-100gb-qsfp28",
+        "me40-1gb-csfp",
+        "me6-10gb-sfp+",
+        "me8-10/25gb-sfp28"
+      ]
+    },
+    "SR-1s": {
+      "sfmCpmTypes": [
+        "None",
+        "cpm-1s"
+      ],
+      "iomCardTypes": [
+        "None",
+        "iom-s-3.0t"
+      ],
+      "mdaTypes": [
+        "None",
+        "ms16-100gb-sfpdd+4-100gb-qsfp28",
+        "ms16-sdd+4-qsfp28-b",
+        "ms18-100gb-qsfp28",
+        "ms2-400gb-qsfpdd+2-100gb-qsfp28",
+        "ms24-10/100gb-sfpdd",
+        "ms3-200gb-cfp2-dco",
+        "ms4-400gb-qsfpdd+4-100gb-qsfp28",
+        "ms6-300gb-cfp2-dco",
+        "ms8-100gb-sfpdd+2-100gb-qsfp28",
+        "ms8-sdd+2-qsfp28-b",
+        "s18-100gb-qsfp28",
+        "s36-100gb-qsfp28",
+        "s36-100gb-qsfp28-3.6t",
+        "s36-400gb-qsfpdd"
+      ]
+    },
+    "SR-1se": {
+      "sfmCpmTypes": [
+        "None",
+        "cpm-1se/imm36-800g-qsfpdd"
+      ],
+      "iomCardTypes": [
+        "None",
+        "cpm-1se/imm36-800g-qsfpdd"
+      ],
+      "mdaTypes": [
+        "None",
+        "ms36-800g-qsfpdd"
+      ]
+    },
+    "SR-1x-48D": {
+      "sfmCpmTypes": [
+        "None",
+        "cpm-1x/i48-800g-qsfpdd-1x"
+      ],
+      "iomCardTypes": [
+        "None",
+        "cpm-1x/i48-800g-qsfpdd-1x"
+      ],
+      "mdaTypes": [
+        "None",
+        "m48-800g-qsfpdd-1x"
+      ]
+    },
+    "SR-1x-92S": {
+      "sfmCpmTypes": [
+        "None",
+        "cpm-1x/i80-200g-sfpdd+12-800g-qsfpdd-1x"
+      ],
+      "iomCardTypes": [
+        "None",
+        "cpm-1x/i80-200g-sfpdd+12-800g-qsfpdd-1x"
+      ],
+      "mdaTypes": [
+        "None",
+        "m80-200g-sfpdd+12-800g-qsfpdd-1x"
+      ]
+    },
+    "SR-2s": {
+      "sfmCpmTypes": [
+        "None",
+        "cpm-2s",
+        "sfm-2s"
+      ],
+      "iomCardTypes": [
+        "None",
+        "iom-s-1.5t",
+        "iom-s-3.0t",
+        "xcm-2s"
+      ],
+      "mdaTypes": [
+        "None",
+        "ms16-100gb-sfpdd+4-100gb-qsfp28",
+        "ms16-sdd+4-qsfp28-b",
+        "ms18-100gb-qsfp28",
+        "ms2-400gb-qsfpdd+2-100gb-qsfp28",
+        "ms24-10/100gb-sfpdd",
+        "ms3-200gb-cfp2-dco",
+        "ms4-400gb-qsfpdd+4-100gb-qsfp28",
+        "ms6-300gb-cfp2-dco",
+        "ms8-100gb-sfpdd+2-100gb-qsfp28",
+        "ms8-sdd+2-qsfp28-b",
+        "s18-100gb-qsfp28",
+        "s36-100gb-qsfp28",
+        "s36-100gb-qsfp28-3.6t",
+        "s36-400gb-qsfpdd"
+      ]
+    },
+    "SR-2se": {
+      "sfmCpmTypes": [
+        "None",
+        "cpm-2se",
+        "sfm-2se"
+      ],
+      "iomCardTypes": [
+        "None",
+        "iom2-se-3.0t",
+        "iom2-se-6.0t",
+        "x2-s36-400g-qsfp112-3.0t",
+        "x2-s36-800g-qsfpdd-6.0t",
+        "xcm-2se",
+        "xcmc-2se"
+      ],
+      "mdaTypes": [
+        "None",
+        "m36-400g-qsfp112",
+        "m36-800g-qsfpdd",
+        "mse14-800g+4-400g",
+        "mse24-200g-sfpdd",
+        "mse6-800g-cfp2-dco",
+        "mse6-800g-qsfpdd",
+        "x2-s36-800g-qsfpdd-12.0t",
+        "x2-s36-800g-qsfpdd-18.0t"
+      ]
+    },
+    "SR-7": {
+      "sfmCpmTypes": [
+        "None",
+        "cpm5",
+        "m-sfm5-12",
+        "m-sfm5-7",
+        "m-sfm6-7/",
+        "m-sfm6-7/12"
+      ],
+      "iomCardTypes": [
+        "None",
+        "imm-2pac-fp3",
+        "imm48-1gb-sfp-c",
+        "iom4-e",
+        "iom4-e-b",
+        "iom4-e-hs",
+        "iom5-e"
+      ],
+      "mdaTypes": [
+        "None",
+        "imm24-1gb-xp-sfp",
+        "isa2-aa",
+        "isa2-bb",
+        "isa2-tunnel",
+        "me1-100gb-cfp2",
+        "me10-10gb-sfp+",
+        "me12-10/1gb-sfp+",
+        "me16-25gb-sfp28+2-100gb-qsfp-b",
+        "me16-25gb-sfp28+2-100gb-qsfp28",
+        "me2-100gb-cfp4",
+        "me2-100gb-ms-qsfp28",
+        "me2-100gb-qsfp28",
+        "me3-200gb-cfp2-dco",
+        "me3-400gb-qsfpdd",
+        "me40-1gb-csfp",
+        "me6-100gb-qsfp28",
+        "me6-10gb-sfp+",
+        "me8-10/25gb-sfp28",
+        "p1-100g-cfp",
+        "p10-10g-sfp"
+      ]
+    },
+    "SR-7s": {
+      "sfmCpmTypes": [
+        "None",
+        "cpm-s",
+        "cpm2-s",
+        "sfm-s",
+        "sfm2-s"
+      ],
+      "iomCardTypes": [
+        "None",
+        "iom-s-1.5t",
+        "iom-s-3.0t",
+        "iom2-se-3.0t",
+        "iom2-se-6.0t",
+        "x2-s36-400g-qsfp112-3.0t",
+        "x2-s36-800g-qsfpdd-6.0t",
+        "xcm-7s",
+        "xcm-7s-b",
+        "xcm2-7s"
+      ],
+      "mdaTypes": [
+        "None",
+        "m36-400g-qsfp112",
+        "m36-800g-qsfpdd",
+        "ms16-100gb-sfpdd+4-100gb-qsfp28",
+        "ms16-sdd+4-qsfp28-b",
+        "ms18-100gb-qsfp28",
+        "ms2-400gb-qsfpdd+2-100gb-qsfp28",
+        "ms24-10/100gb-sfpdd",
+        "ms3-200gb-cfp2-dco",
+        "ms4-400gb-qsfpdd+4-100gb-qsfp28",
+        "ms6-300gb-cfp2-dco",
+        "ms8-100gb-sfpdd+2-100gb-qsfp28",
+        "ms8-sdd+2-qsfp28-b",
+        "mse14-800g+4-400g",
+        "mse24-200g-sfpdd",
+        "mse6-800g-cfp2-dco",
+        "mse6-800g-qsfpdd",
+        "s18-100gb-qsfp28",
+        "s36-100gb-qsfp28",
+        "s36-100gb-qsfp28-3.6t",
+        "s36-400gb-qsfpdd",
+        "x2-s36-800g-qsfpdd-12.0t",
+        "x2-s36-800g-qsfpdd-18.0t"
+      ]
+    },
+    "SR-12": {
+      "sfmCpmTypes": [
+        "None",
+        "cpm5",
+        "m-sfm5-12",
+        "m-sfm6-7/",
+        "m-sfm6-7/12"
+      ],
+      "iomCardTypes": [
+        "None",
+        "imm-2pac-fp3",
+        "imm48-1gb-sfp-c",
+        "iom4-e",
+        "iom4-e-b",
+        "iom4-e-hs",
+        "iom5-e"
+      ],
+      "mdaTypes": [
+        "None",
+        "imm24-1gb-xp-sfp",
+        "isa2-aa",
+        "isa2-bb",
+        "isa2-tunnel",
+        "me1-100gb-cfp2",
+        "me10-10gb-sfp+",
+        "me12-10/1gb-sfp+",
+        "me16-25gb-sfp28+2-100gb-qsfp-b",
+        "me16-25gb-sfp28+2-100gb-qsfp28",
+        "me2-100gb-cfp4",
+        "me2-100gb-ms-qsfp28",
+        "me2-100gb-qsfp28",
+        "me3-200gb-cfp2-dco",
+        "me3-400gb-qsfpdd",
+        "me40-1gb-csfp",
+        "me6-100gb-qsfp28",
+        "me6-10gb-sfp+",
+        "me8-10/25gb-sfp28",
+        "p1-100g-cfp",
+        "p10-10g-sfp"
+      ]
+    },
+    "SR-12e": {
+      "sfmCpmTypes": [
+        "None",
+        "cpm5",
+        "m-sfm5-12e",
+        "m-sfm6-12e"
+      ],
+      "iomCardTypes": [
+        "None",
+        "imm-2pac-fp3",
+        "imm4-100gb-cfp4",
+        "imm40-10gb-sfp",
+        "iom4-e",
+        "iom4-e-b",
+        "iom4-e-hs",
+        "iom5-e"
+      ],
+      "mdaTypes": [
+        "None",
+        "isa2-aa",
+        "isa2-bb",
+        "isa2-tunnel",
+        "m4-100g-cfp4",
+        "m40-10g-sfp",
+        "me1-100gb-cfp2",
+        "me10-10gb-sfp+",
+        "me12-10/1gb-sfp+",
+        "me12-100gb-qsfp28",
+        "me16-25gb-sfp28+2-100gb-qsfp-b",
+        "me16-25gb-sfp28+2-100gb-qsfp28",
+        "me2-100gb-cfp4",
+        "me2-100gb-ms-qsfp28",
+        "me2-100gb-qsfp28",
+        "me3-200gb-cfp2-dco",
+        "me3-400gb-qsfpdd",
+        "me40-1gb-csfp",
+        "me6-100gb-qsfp28",
+        "me6-10gb-sfp+",
+        "me6-400gb-qsfpdd",
+        "me8-10/25gb-sfp28",
+        "p1-100g-cfp",
+        "p10-10g-sfp"
+      ]
+    },
+    "SR-14s": {
+      "sfmCpmTypes": [
+        "None",
+        "cpm-s",
+        "cpm2-s",
+        "sfm-s",
+        "sfm2-s"
+      ],
+      "iomCardTypes": [
+        "None",
+        "iom-s-1.5t",
+        "iom-s-3.0t",
+        "iom2-se-3.0t",
+        "iom2-se-6.0t",
+        "x2-s36-400g-qsfp112-3.0t",
+        "x2-s36-800g-qsfpdd-6.0t",
+        "xcm-14s",
+        "xcm-14s-b",
+        "xcm2-14s"
+      ],
+      "mdaTypes": [
+        "None",
+        "m36-400g-qsfp112",
+        "m36-800g-qsfpdd",
+        "ms16-100gb-sfpdd+4-100gb-qsfp28",
+        "ms16-sdd+4-qsfp28-b",
+        "ms18-100gb-qsfp28",
+        "ms2-400gb-qsfpdd+2-100gb-qsfp28",
+        "ms24-10/100gb-sfpdd",
+        "ms3-200gb-cfp2-dco",
+        "ms4-400gb-qsfpdd+4-100gb-qsfp28",
+        "ms6-300gb-cfp2-dco",
+        "ms8-100gb-sfpdd+2-100gb-qsfp28",
+        "ms8-sdd+2-qsfp28-b",
+        "mse14-800g+4-400g",
+        "mse24-200g-sfpdd",
+        "mse6-800g-cfp2-dco",
+        "mse6-800g-qsfpdd",
+        "s18-100gb-qsfp28",
+        "s36-100gb-qsfp28",
+        "s36-100gb-qsfp28-3.6t",
+        "s36-400gb-qsfpdd",
+        "x2-s36-800g-qsfpdd-12.0t",
+        "x2-s36-800g-qsfpdd-18.0t"
+      ]
+    },
+    "SR-a4SR-a8": {
+      "sfmCpmTypes": [
+        "None",
+        "cpm-a"
+      ],
+      "iomCardTypes": [
+        "None",
+        "iom-a"
+      ],
+      "mdaTypes": [
+        "None",
+        "ma2-10gb-sfp+12-1gb-sfp",
+        "ma20-1gb-tx",
+        "ma4-10gb-sfp+",
+        "ma44-1gb-csfp",
+        "maxp1-100gb-cfp",
+        "maxp1-100gb-cfp2",
+        "maxp1-100gb-cfp4",
+        "maxp10-10/1gb-msec-sfp+",
+        "maxp10-10gb-sfp+",
+        "maxp6-10gb-sfp+1-40gb-qsfp+"
+      ]
+    },
+    "XRS-20XRS-20e": {
+      "sfmCpmTypes": [
+        "None",
+        "cpm-x20",
+        "cpm2-x20",
+        "sfm-x20",
+        "sfm-x20-b",
+        "sfm-x20s-b",
+        "sfm2-x20s"
+      ],
+      "iomCardTypes": [
+        "None",
+        "xcm-x20",
+        "xcm2-x20"
+      ],
+      "mdaTypes": [
+        "None",
+        "x12-400g-qsfpdd",
+        "x2-100g-tun",
+        "x24-100g-qsfp28",
+        "x4-100g-cfp2",
+        "x40-10g-sfp",
+        "x6-200g-cfp2-dco",
+        "x6-400g-cfp8"
+      ]
+    },
+    "VSR-I": {
+      "sfmCpmTypes": [
+        "None",
+        "cpm-v/iom-v"
+      ],
+      "iomCardTypes": [
+        "None",
+        "cpm-v/iom-v"
+      ],
+      "mdaTypes": [
+        "None",
+        "m20-v"
+      ]
+    }
+  },
+  "sfmCpmTypes": [
+    "None",
+    "cpiom-ixr-r6",
+    "cpm-1",
+    "cpm-1s",
+    "cpm-1se/imm36-800g-qsfpdd",
+    "cpm-1x/dms24-800g-qsfpdd-1",
+    "cpm-1x/i24-800g-qsfpdd-1",
+    "cpm-1x/i40-200g-sfpdd+6-800g-qsfpdd-1",
+    "cpm-1x/i48-400g-qsfpdd-1",
+    "cpm-1x/i48-800g-qsfpdd-1x",
+    "cpm-1x/i80-200g-sfpdd+12-400g-qsfpdd-1",
+    "cpm-1x/i80-200g-sfpdd+12-800g-qsfpdd-1x",
+    "cpm-2s",
+    "cpm-2se",
+    "cpm-a",
+    "cpm-e",
+    "cpm-ixr",
+    "cpm-ixr-e-gnss/imm14-10g-sfp++4-1g-tx",
+    "cpm-ixr-e-gnss/imm24-sfp++8-sfp28+2-qsfp28",
+    "cpm-ixr-e/imm14-10g-sfp++4-1g-tx",
+    "cpm-ixr-e/imm24-sfp++8-sfp28+2-qsfp28",
+    "cpm-ixr-e2",
+    "cpm-ixr-e2c",
+    "cpm-ixr-ec",
+    "cpm-ixr-r4",
+    "cpm-ixr-r6d/iom-ixr-r6d",
+    "cpm-ixr-s/imm48-sfp++6-qsfp28",
+    "cpm-ixr-x/imm32-qsfp28+4-qsfpdd",
+    "cpm-ixr-x/imm36-qsfpdd",
+    "cpm-ixr-x/imm6-qsfpdd+48-sfp56",
+    "cpm-s",
+    "cpm-sar-hm",
+    "cpm-sar-hmc",
+    "cpm-v/iom-v",
+    "cpm-x20",
+    "cpm2-s",
+    "cpm2-x20",
+    "cpm5",
+    "m-sfm5-12",
+    "m-sfm5-12e",
+    "m-sfm5-7",
+    "m-sfm6-12e",
+    "m-sfm6-7/",
+    "m-sfm6-7/12",
+    "sfm-2s",
+    "sfm-2se",
+    "sfm-ixr-10",
+    "sfm-ixr-6",
+    "sfm-s",
+    "sfm-x20",
+    "sfm-x20-b",
+    "sfm-x20s-b",
+    "sfm2-s",
+    "sfm2-x20s"
+  ],
+  "iomCardTypes": [
+    "None",
+    "cpiom-ixr-r6",
+    "cpm-1se/imm36-800g-qsfpdd",
+    "cpm-1x/dms24-800g-qsfpdd-1",
+    "cpm-1x/i24-800g-qsfpdd-1",
+    "cpm-1x/i40-200g-sfpdd+6-800g-qsfpdd-1",
+    "cpm-1x/i48-400g-qsfpdd-1",
+    "cpm-1x/i48-800g-qsfpdd-1x",
+    "cpm-1x/i80-200g-sfpdd+12-400g-qsfpdd-1",
+    "cpm-1x/i80-200g-sfpdd+12-800g-qsfpdd-1x",
+    "cpm-ixr-e-gnss/imm14-10g-sfp++4-1g-tx",
+    "cpm-ixr-e-gnss/imm24-sfp++8-sfp28+2-qsfp28",
+    "cpm-ixr-e/imm14-10g-sfp++4-1g-tx",
+    "cpm-ixr-e/imm24-sfp++8-sfp28+2-qsfp28",
+    "cpm-ixr-r6d/iom-ixr-r6d",
+    "cpm-ixr-s/imm48-sfp++6-qsfp28",
+    "cpm-ixr-x/imm32-qsfp28+4-qsfpdd",
+    "cpm-ixr-x/imm36-qsfpdd",
+    "cpm-ixr-x/imm6-qsfpdd+48-sfp56",
+    "cpm-v/iom-v",
+    "imm-2pac-fp3",
+    "imm36-100g-qsfp28",
+    "imm4-100gb-cfp4",
+    "imm40-10gb-sfp",
+    "imm48-1gb-sfp-c",
+    "imm48-sfp+2-qsfp28",
+    "iom-a",
+    "iom-e",
+    "iom-ixr-r4",
+    "iom-s-1.5t",
+    "iom-s-3.0t",
+    "iom-sar",
+    "iom2-se-3.0t",
+    "iom2-se-6.0t",
+    "iom4-e",
+    "iom4-e-b",
+    "iom4-e-hs",
+    "iom5-e",
+    "x2-s36-400g-qsfp112-3.0t",
+    "x2-s36-800g-qsfpdd-6.0t",
+    "xcm-14s",
+    "xcm-14s-b",
+    "xcm-2s",
+    "xcm-2se",
+    "xcm-7s",
+    "xcm-7s-b",
+    "xcm-x20",
+    "xcm2-14s",
+    "xcm2-7s",
+    "xcm2-x20",
+    "xcmc-2se"
+  ],
+  "mdaTypes": [
+    "None",
+    "a32-chds1v2",
+    "d24-800g-qsfpdd-1",
+    "i1-wlan",
+    "i2-cellular",
+    "i2-sdi",
+    "i3-10/100eth-tx",
+    "i6-10/100eth-tx",
+    "imm24-1gb-xp-sfp",
+    "isa-ms-v",
+    "isa2-aa",
+    "isa2-bb",
+    "isa2-tunnel",
+    "m1-400g-qsfpdd+1-100g-qsfp28",
+    "m10-10g-sfp+",
+    "m10-1g-sfp+2-10g-sfp+",
+    "m10-50g-sfp56",
+    "m10-sfp++6-sfp",
+    "m12-sfp28+2-qsfp28",
+    "m14-10g-sfp++4-1g-tx",
+    "m18-25g-sfp28",
+    "m2-100g-qsfp28+16-10g-sfp+",
+    "m2-cfp2",
+    "m2-qsfpdd+2-qsfp28+24-sfp28",
+    "m20-10g-sfp+",
+    "m20-1g-csfp",
+    "m20-v",
+    "m24-800g-qsfpdd-1",
+    "m24-sfp++8-sfp28+2-qsfp28",
+    "m32-1g-csfp",
+    "m32-qsfp28+4-qsfpdd",
+    "m36-100g-qsfp28",
+    "m36-400g-qsfp112",
+    "m36-800g-qsfpdd",
+    "m36-qsfpdd",
+    "m4-100g-cfp4",
+    "m4-10g-sfp++1-100g-cfp2",
+    "m4-1g-tx+20-1g-sfp+6-10g-sfp+",
+    "m40-10g-sfp",
+    "m40-200g-sfpdd+6-800g-qsfpdd-1",
+    "m46-10g-sfp+",
+    "m48-400g-qsfpdd-1",
+    "m48-800g-qsfpdd-1x",
+    "m48-sfp++6-qsfp28",
+    "m48-sfp+2-qsfp28",
+    "m5-100g-qsfp28",
+    "m6-10g-sfp++1-100g-qsfp28",
+    "m6-10g-sfp++4-25g-sfp28",
+    "m6-qsfpdd+48-sfp56",
+    "m80-1g-csfp",
+    "m80-200g-sfpdd+12-400g-qsfpdd-",
+    "m80-200g-sfpdd+12-800g-qsfpdd-1x",
+    "ma2-10gb-sfp+12-1gb-sfp",
+    "ma20-1gb-tx",
+    "ma4-10gb-sfp+",
+    "ma44-1gb-csfp",
+    "maxp1-100gb-cfp",
+    "maxp1-100gb-cfp2",
+    "maxp1-100gb-cfp4",
+    "maxp10-10/1gb-msec-sfp+",
+    "maxp10-10gb-sfp+",
+    "maxp6-10gb-sfp+1-40gb-qsfp+",
+    "me1-100gb-cfp2",
+    "me10-10gb-sfp+",
+    "me12-10/1gb-sfp+",
+    "me12-100gb-qsfp28",
+    "me16-25gb-sfp28+2-100gb-qsfp-b",
+    "me16-25gb-sfp28+2-100gb-qsfp28",
+    "me2-100gb-cfp4",
+    "me2-100gb-ms-qsfp28",
+    "me2-100gb-qsfp28",
+    "me3-200gb-cfp2-dco",
+    "me3-400gb-qsfpdd",
+    "me40-1gb-csfp",
+    "me6-100gb-qsfp28",
+    "me6-10gb-sfp+",
+    "me6-400gb-qsfpdd",
+    "me8-10/25gb-sfp28",
+    "ms16-100gb-sfpdd+4-100gb-qsfp28",
+    "ms16-sdd+4-qsfp28-b",
+    "ms18-100gb-qsfp28",
+    "ms2-400gb-qsfpdd+2-100gb-qsfp28",
+    "ms24-10/100gb-sfpdd",
+    "ms3-200gb-cfp2-dco",
+    "ms36-800g-qsfpdd",
+    "ms4-400gb-qsfpdd+4-100gb-qsfp28",
+    "ms6-300gb-cfp2-dco",
+    "ms8-100gb-sfpdd+2-100gb-qsfp28",
+    "ms8-sdd+2-qsfp28-b",
+    "mse14-800g+4-400g",
+    "mse24-200g-sfpdd",
+    "mse6-800g-cfp2-dco",
+    "mse6-800g-qsfpdd",
+    "p1-100g-cfp",
+    "p10-10g-sfp",
+    "s18-100gb-qsfp28",
+    "s36-100gb-qsfp28",
+    "s36-100gb-qsfp28-3.6t",
+    "s36-400gb-qsfpdd",
+    "x12-400g-qsfpdd",
+    "x2-100g-tun",
+    "x2-s36-800g-qsfpdd-12.0t",
+    "x2-s36-800g-qsfpdd-18.0t",
+    "x24-100g-qsfp28",
+    "x4-100g-cfp2",
+    "x40-10g-sfp",
+    "x6-200g-cfp2-dco",
+    "x6-400g-cfp8"
+  ]
+}
