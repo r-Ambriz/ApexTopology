@@ -1691,14 +1691,44 @@ ALSO GENERATE ContainerLab YAML:
 name: ${topology.labName}
 
 topology:
+  kinds:
+    nokia_srsim:
+      image: nokia_srsim:${topology.srosVersion}
+      license: /opt/nokia/sros/license.txt
+
   nodes:
+    # Generate one node entry per topology node using Containerlab's Nokia SR-SIM kind.
+    # Example integrated/non-distributed node:
+    # <node-name>:
+    #   kind: nokia_srsim
+    #   type: <lowercase chassisModel, for example sr-1 or ixr-r6>
+    #   startup-config: <node-name>.sros.cfg
+    #   components:
+    #     - mda:
+    #       - slot: 1
+    #         type: <selected MDA type>   # omit when MDA is None
+    #
+    # Example distributed grouped node:
+    # <node-name>:
+    #   kind: nokia_srsim
+    #   type: <lowercase chassisModel, for example sr-7 or sr-14s>
+    #   startup-config: <node-name>.sros.cfg
+    #   components:
+    #     - slot: A
+    #       sfm: <selected SFM type>      # include when selected and applicable
+    #     - slot: B
+    #       sfm: <selected SFM type>      # include for dual-CPM chassis
+    #     - slot: 1
+    #       type: <selected IOM/Card type>
+    #       sfm: <selected SFM type>
+    #       mda:
+    #         - slot: 1
+    #           type: <selected MDA type>
+    #
 ${nodes.map(n => `    ${n.name}:
-      kind: nokia_sros
-      image: registry.srlinux.dev/pub/vr-sros:${topology.srosVersion}
-      startup-config: ${n.name}.sros.cfg
-      ports:
-        - 830:830   # NETCONF
-        - 57400:57400  # gNMI`).join('\n')}
+      kind: nokia_srsim
+      type: ${(n.chassisModel && n.chassisModel !== "None" ? n.chassisModel : n.type).toLowerCase().replace(/_/g, "-")}
+      startup-config: ${n.name}.sros.cfg`).join('\n')}
 
   links:
 ${links.filter(l => l.nodeA && l.nodeB).map(l => `    - endpoints: ["${l.nodeA}:${l.ifaceA}", "${l.nodeB}:${l.ifaceB}"]`).join('\n')}
@@ -1713,6 +1743,15 @@ CRITICAL RULES:
 - For ISIS: generate system-id from router-id (e.g., 10.0.0.1 → 0100.0000.0001)
 - Include proper BGP families based on service type (vpn-ipv4 for L3VPN, evpn for EVPN)
 - Add auto-bind-tunnel for VPRNs
+- For Containerlab, use Containerlab SR-SIM kind syntax from https://containerlab.dev/manual/kinds/sros/
+- Always use kind: nokia_srsim for SR OS SIM nodes.
+- Always use the selected chassisModel as the node type when present; lowercase it in clab.yml (examples: SR-1 → sr-1, SR-7 → sr-7, IXR-R6 → ixr-r6, XRS-20/XRS-20e → xrs-20/xrs-20e).
+- Use the selected SFM/CPM Type, IOM/Card Type, and MDA Type fields to populate Containerlab components.
+- Non-distributed/integrated nodes: create one node with kind: nokia_srsim, type, startup-config, and only the applicable components overrides. Use mda slot 1 for a selected MDA when no IOM/Card is required.
+- Distributed/chassis nodes such as SR-7, SR-12, SR-14s, SR-2s, SR-2se, XRS-20/XRS-20e, ESS-7, and ESS-12: create one grouped node with kind: nokia_srsim, type, startup-config, and a components list containing CPM/SFM slots and line-card/IOM slots as needed.
+- Do not use the legacy nokia_sros kind and do not use vr-sros images in clab.yml.
+- Include license configuration under topology.kinds.nokia_srsim. Use /opt/nokia/sros/license.txt as the default license path unless the topology JSON provides another path.
+- Do not publish NETCONF/gNMI ports unless explicitly requested; SR-SIM/containerlab can expose management through its normal mgmt network.
 - Complete, production-ready configs only`;
 }
 
