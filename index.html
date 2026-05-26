@@ -1,232 +1,750 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ApexTopology - Nokia SR OS Configuration Generator</title>
-  <meta name="description" content="AI-Powered Nokia SR OS Configuration Generator for ContainerLab">
-  <meta name="theme-color" content="#1e1e1e">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80' fill='%23007acc'>◈</text></svg>">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body, #root { height: 100%; }
-    body { background: #1e1e1e; color: #d4d4d4; font-family: 'Inter', sans-serif; overflow-x: hidden; }
-    ::-webkit-scrollbar { width: 8px; height: 8px; }
-    ::-webkit-scrollbar-track { background: #1e1e1e; }
-    ::-webkit-scrollbar-thumb { background: #424242; border-radius: 4px; }
-    ::-webkit-scrollbar-thumb:hover { background: #555; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ApexTopology v0.3 - Nokia SR OS Configuration Generator</title>
+    <meta name="description" content="Template-based Nokia SR OS Configuration Generator for ContainerLab">
+    <meta name="theme-color" content="#1e1e1e">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='75' font-size='75' fill='%23007acc'>◈</text></svg>">
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
 <body>
-  <div id="root"><div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#1e1e1e;color:#007acc;font-family:'JetBrains Mono',monospace;font-size:14px">Loading ApexTopology...</div></div>
-  <script type="text/babel" data-presets="react">
-const { useState, useCallback, useRef, useEffect } = React;
+    <div id="root"></div>
+    
+    <!-- Template Engine -->
+    <script>
+// Template Engine - Lightweight Handlebars-style renderer
+class TemplateEngine {
+  render(template, context) {
+    let result = template;
+    result = this._processEach(result, context);
+    result = this._processIf(result, context);
+    result = this._processVariables(result, context);
+    return result;
+  }
 
-const G = {
-  bg:'#1e1e1e',bg2:'#252526',bg3:'#2d2d30',bg4:'#333333',
-  border:'#3e3e42',accent:'#007acc',accent2:'#569cd6',accent3:'#4ec9b0',
-  green:'#4caf50',yellow:'#dcdcaa',orange:'#ce9178',red:'#f44747',purple:'#c586c0',
-  text:'#d4d4d4',textMuted:'#858585',textDim:'#6a6a6a',
-};
-const css = {
-  input:{background:G.bg,border:`1px solid ${G.border}`,borderRadius:3,color:G.text,fontFamily:"'JetBrains Mono',monospace",fontSize:12,padding:'5px 8px',width:'100%',outline:'none'},
-  label:{fontSize:10,color:G.textMuted,fontFamily:"'JetBrains Mono',monospace",letterSpacing:1,textTransform:'uppercase',marginBottom:4,display:'block'},
-  btn:{background:G.accent,border:'none',borderRadius:3,color:'#fff',cursor:'pointer',fontFamily:"'JetBrains Mono',monospace",fontSize:12,fontWeight:600,padding:'6px 14px',letterSpacing:0.5},
-  card:{background:G.bg2,border:`1px solid ${G.border}`,borderRadius:4,padding:16},
-};
-function uid(){return Math.random().toString(36).slice(2,8);}
-function Label({children}){return <span style={css.label}>{children}</span>;}
-function Input({label,value,onChange,placeholder,type='text',style={}}){
-  return(<div>{label&&<Label>{label}</Label>}<input type={type} value={value} placeholder={placeholder} onChange={e=>onChange(e.target.value)} style={{...css.input,...style}}/></div>);
-}
-function Select({label,value,onChange,options}){
-  return(<div>{label&&<Label>{label}</Label>}<select value={value} onChange={e=>onChange(e.target.value)} style={{...css.input,cursor:'pointer'}}>{options.map(o=>typeof o==='object'?<option key={o.value} value={o.value}>{o.label}</option>:<option key={o} value={o}>{o}</option>)}</select></div>);
-}
-function Badge({color=G.accent,children}){
-  return <span style={{background:color+'33',color,border:`1px solid ${color}88`,borderRadius:2,padding:'2px 8px',fontSize:11,fontFamily:"'JetBrains Mono',monospace",fontWeight:500,letterSpacing:0.5}}>{children}</span>;
-}
-function Button({onClick,children,color=G.accent,outline=false,small=false,style={}}){
-  const[hover,setHover]=useState(false);
-  return(<button onClick={onClick} onMouseEnter={()=>setHover(true)} onMouseLeave={()=>setHover(false)} style={{...css.btn,background:outline?(hover?color+'22':'transparent'):(hover?color+'cc':color),border:outline?`1px solid ${color}`:'none',color:outline?color:'#fff',padding:small?'4px 10px':'6px 14px',fontSize:small?11:12,transition:'all 0.15s',...style}}>{children}</button>);
-}
-const NODE_TYPES=['7750 SR-1','7750 SR-7','7750 SR-12','7750 SR-14s','7450 ESS-7','7210 SAS-M','7210 SAS-T','7710 SR-c4','7710 SR-c12','vRR','vSR','SR-1e','SR-2e','SR-7s','SR-14s'];
-const DEFAULT_NODE=()=>({id:uid(),name:'',type:'7750 SR-7',mgmtIp:'',loopback:'',asn:'',role:'PE',group:'core',systemIp:''});
-function NodeForm({node,onChange,onDelete}){
-  const field=(key)=>(val)=>onChange({...node,[key]:val});
-  return(<div style={{...css.card,marginBottom:8}}>
-    <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:12}}>
-      <Badge color={G.accent3}>{node.role}</Badge>
-      <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:13,color:G.accent,flex:1,fontWeight:700}}>{node.name||<span style={{color:G.textDim}}>unnamed node</span>}</span>
-      <button onClick={onDelete} style={{background:'none',border:'none',color:G.red,cursor:'pointer',fontSize:16,padding:'0 4px'}}>✕</button>
-    </div>
-    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(160px, 1fr))',gap:10}}>
-      <Input label="Node Name" value={node.name} onChange={field('name')} placeholder="R1"/>
-      <Select label="Platform" value={node.type} onChange={field('type')} options={NODE_TYPES}/>
-      <Select label="Role" value={node.role} onChange={field('role')} options={['PE','P','RR','CE','ASBR','BNG','vRR']}/>
-      <Input label="Group" value={node.group} onChange={field('group')} placeholder="core"/>
-      <Input label="Mgmt IP/CIDR" value={node.mgmtIp} onChange={field('mgmtIp')} placeholder="172.20.20.10/24"/>
-      <Input label="System / Loopback" value={node.loopback} onChange={field('loopback')} placeholder="192.168.1.1/32"/>
-      <Input label="BGP ASN" value={node.asn} onChange={field('asn')} placeholder="64512"/>
-    </div>
-  </div>);
-}
-const DEFAULT_LINK=(nodes)=>({id:uid(),nodeA:nodes[0]?.name||'',portA:'1/1/1',nodeB:nodes[1]?.name||nodes[0]?.name||'',portB:'1/1/1',ipA:'',ipB:'',encap:'null',vlanId:'',metric:'10',bfd:false,mpls:true,description:''});
-function LinkForm({link,nodes,onChange,onDelete}){
-  const f=(key)=>(val)=>onChange({...link,[key]:val});
-  const nodeOpts=nodes.map(n=>n.name).filter(Boolean);
-  return(<div style={{...css.card,marginBottom:8}}>
-    <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:12}}>
-      <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:12,color:G.yellow,flex:1}}>{link.nodeA||'?'}/{link.portA} ↔ {link.nodeB||'?'}/{link.portB}</span>
-      <button onClick={onDelete} style={{background:'none',border:'none',color:G.red,cursor:'pointer',fontSize:16,padding:'0 4px'}}>✕</button>
-    </div>
-    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(150px, 1fr))',gap:10}}>
-      <Select label="Node A" value={link.nodeA} onChange={f('nodeA')} options={nodeOpts}/>
-      <Input label="Port A" value={link.portA} onChange={f('portA')} placeholder="1/1/1"/>
-      <Input label="IP A /30 or /31" value={link.ipA} onChange={f('ipA')} placeholder="10.0.0.0/31"/>
-      <Select label="Node B" value={link.nodeB} onChange={f('nodeB')} options={nodeOpts}/>
-      <Input label="Port B" value={link.portB} onChange={f('portB')} placeholder="1/1/2"/>
-      <Input label="IP B /30 or /31" value={link.ipB} onChange={f('ipB')} placeholder="10.0.0.1/31"/>
-      <Select label="Encapsulation" value={link.encap} onChange={f('encap')} options={['null','dot1q','qinq','ppp']}/>
-      {link.encap!=='null'&&<Input label="VLAN ID" value={link.vlanId} onChange={f('vlanId')} placeholder="100"/>}
-      <Input label="IS-IS Metric" value={link.metric} onChange={f('metric')} placeholder="10"/>
-      <Input label="Description" value={link.description} onChange={f('description')} placeholder="R1-R2 core link"/>
-      <div style={{display:'flex',gap:16,alignItems:'center',paddingTop:18}}>
-        <label style={{display:'flex',gap:6,alignItems:'center',cursor:'pointer',fontSize:12,color:G.text}}><input type="checkbox" checked={link.bfd} onChange={e=>f('bfd')(e.target.checked)}/>BFD</label>
-        <label style={{display:'flex',gap:6,alignItems:'center',cursor:'pointer',fontSize:12,color:G.text}}><input type="checkbox" checked={link.mpls} onChange={e=>f('mpls')(e.target.checked)}/>MPLS</label>
-      </div>
-    </div>
-  </div>);
-}
-function GlobalConfig({global,setGlobal}){
-  const f=(key)=>(val)=>setGlobal(p=>({...p,[key]:val}));
-  return(<div style={css.card}>
-    <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:G.accent,marginBottom:14,fontWeight:700,letterSpacing:1}}>GLOBAL SETTINGS</div>
-    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(170px, 1fr))',gap:12}}>
-      <Input label="Lab Name" value={global.labName} onChange={f('labName')} placeholder="mpls-core-lab"/>
-      <Select label="SR OS Version" value={global.srosVersion} onChange={f('srosVersion')} options={["23.3.R2","23.7.R1","23.10.R2","24.3.R2","24.7.R1","24.10.R1","25.3.R1","25.7.R1","25.10.R3"]}/>
-      <Select label="IS-IS Level" value={global.isisLevel} onChange={f('isisLevel')} options={['level-1','level-2','level-1-2']}/>
-      <Input label="IS-IS Area" value={global.isisArea} onChange={f('isisArea')} placeholder="49.0001"/>
-      <Input label="BGP Router ID Base" value={global.bgpBase} onChange={f('bgpBase')} placeholder="192.168.0"/>
-      <Select label="MPLS Protocol" value={global.mplsProto} onChange={f('mplsProto')} options={['LDP','RSVP-TE','SR-MPLS','SRv6']}/>
-      <Select label="VPN Type" value={global.vpnType} onChange={f('vpnType')} options={['L3VPN','EVPN','VPLS','VLL','None']}/>
-      <Select label="Mgmt Network" value={global.mgmtNet} onChange={f('mgmtNet')} options={['Management','OOB','In-band']}/>
-      <Input label="DNS Domain" value={global.dnsDomain} onChange={f('dnsDomain')} placeholder="lab.nokia.net"/>
-      <Input label="NTP Server" value={global.ntp} onChange={f('ntp')} placeholder="192.168.1.254"/>
-      <div style={{display:'flex',gap:12,alignItems:'center',paddingTop:18}}>
-        <label style={{display:'flex',gap:6,alignItems:'center',cursor:'pointer',fontSize:12,color:G.text}}><input type="checkbox" checked={global.bfd} onChange={e=>f('bfd')(e.target.checked)}/>Global BFD</label>
-        <label style={{display:'flex',gap:6,alignItems:'center',cursor:'pointer',fontSize:12,color:G.text}}><input type="checkbox" checked={global.snmp} onChange={e=>f('snmp')(e.target.checked)}/>SNMP</label>
-      </div>
-    </div>
-  </div>);
-}
-function buildSystemPrompt(global){
-  return `You are an expert Nokia SR OS network engineer with deep knowledge of SR OS ${global.srosVersion} CLI syntax and ContainerLab.\n\nGenerate COMPLETE Nokia SR OS configuration files ready to paste. Rules:\n- Correct SR OS ${global.srosVersion} CLI hierarchy\n- Always include "no shutdown"\n- 4-space indentation\n- IS-IS ${global.isisLevel} area ${global.isisArea}\n- MPLS: ${global.mplsProto}\n- Lab: ${global.labName}, Domain: ${global.dnsDomain}\n${global.ntp?`- NTP: ${global.ntp}`:''}\n${global.snmp?'- SNMP v2c community "public" read-only':''}\n${global.bfd?'- Enable BFD globally':''}\n\nOutput ONLY raw configuration, no markdown, no backticks.`;
-}
-function buildUserPrompt(node,links,global){
-  const myLinks=links.filter(l=>l.nodeA===node.name||l.nodeB===node.name);
-  return `Generate complete SR OS config for:\nNODE: ${node.name}\nPlatform: ${node.type}\nRole: ${node.role}\nSystem IP: ${node.loopback||'not specified'}\nMgmt IP: ${node.mgmtIp||'not specified'}\nBGP ASN: ${node.asn||'not specified'}\nGroup: ${node.group}\n\nINTERFACES:\n${myLinks.map(l=>{const isA=l.nodeA===node.name;const peer=isA?l.nodeB:l.nodeA;const myPort=isA?l.portA:l.portB;const myIp=isA?l.ipA:l.ipB;const peerIp=isA?l.ipB:l.ipA;return `Port ${myPort} → ${peer} (peer ${peerIp||'N/A'})\n  My IP: ${myIp||'N/A'} | Encap: ${l.encap}${l.vlanId?` VLAN ${l.vlanId}`:''} | Metric: ${l.metric} | BFD: ${l.bfd?'yes':'no'} | MPLS: ${l.mpls?'yes':'no'}\n  Desc: ${l.description||'none'}`;}).join('\n\n')||'  No links'}\n\nVPN: ${global.vpnType} | BGP Base: ${global.bgpBase}\n\nGenerate full config now:`;
-}
-function OutputPanel({configs}){
-  const[active,setActive]=useState(0);
-  const[copied,setCopied]=useState(false);
-  if(!configs.length)return null;
-  const cfg=configs[active];
-  const copy=()=>navigator.clipboard.writeText(cfg.config).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),2000);});
-  const dl=()=>{const b=new Blob([cfg.config],{type:'text/plain'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`${cfg.name}.cfg`;a.click();};
-  const dlAll=()=>configs.forEach(c=>setTimeout(()=>{const b=new Blob([c.config],{type:'text/plain'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`${c.name}.cfg`;a.click();},200));
-  return(<div style={{display:'flex',flexDirection:'column',height:'100%'}}>
-    <div style={{display:'flex',gap:2,overflowX:'auto',background:G.bg3,borderBottom:`1px solid ${G.border}`,padding:'4px 8px 0',flexShrink:0}}>
-      {configs.map((c,i)=><button key={c.name} onClick={()=>setActive(i)} style={{background:active===i?G.bg2:'transparent',border:'none',borderBottom:active===i?`2px solid ${G.accent}`:'2px solid transparent',color:active===i?G.accent:G.textMuted,cursor:'pointer',fontFamily:"'JetBrains Mono',monospace",fontSize:11,padding:'6px 12px',whiteSpace:'nowrap'}}>{c.name}.cfg</button>)}
-    </div>
-    <div style={{display:'flex',gap:8,padding:'8px 12px',background:G.bg3,borderBottom:`1px solid ${G.border}`,flexShrink:0}}>
-      <Button onClick={copy} small>{copied?'✓ Copied!':'⎘ Copy'}</Button>
-      <Button onClick={dl} small outline>↓ Download .cfg</Button>
-      {configs.length>1&&<Button onClick={dlAll} small outline>↓ All ({configs.length})</Button>}
-      <span style={{flex:1}}/>
-      <span style={{fontSize:11,color:G.textMuted,fontFamily:"'JetBrains Mono',monospace",alignSelf:'center'}}>{cfg.config.split('\n').length} lines</span>
-    </div>
-    <pre style={{flex:1,overflow:'auto',margin:0,padding:16,background:G.bg,color:G.text,fontFamily:"'JetBrains Mono',monospace",fontSize:12,lineHeight:1.6,whiteSpace:'pre',tabSize:4}}>{cfg.config}</pre>
-  </div>);
-}
-const TABS=['NODES','LINKS','GLOBAL','OUTPUT'];
-function App(){
-  const[tab,setTab]=useState(0);
-  const[nodes,setNodes]=useState([]);
-  const[links,setLinks]=useState([]);
-  const[global,setGlobal]=useState({labName:'mpls-core-lab',srosVersion:'25.10.R3',isisLevel:'level-2',isisArea:'49.0001',bgpBase:'192.168.0',mplsProto:'SR-MPLS',vpnType:'L3VPN',mgmtNet:'Management',dnsDomain:'lab.nokia.net',ntp:'',bfd:true,snmp:false});
-  const[configs,setConfigs]=useState([]);
-  const[loading,setLoading]=useState(false);
-  const[error,setError]=useState('');
-  const[progress,setProgress]=useState('');
-  const addNode=()=>setNodes(n=>[...n,DEFAULT_NODE()]);
-  const updateNode=(id,data)=>setNodes(n=>n.map(x=>x.id===id?data:x));
-  const deleteNode=(id)=>setNodes(n=>n.filter(x=>x.id!==id));
-  const addLink=()=>{if(nodes.length<2){setError('Add at least 2 nodes first.');return;}setLinks(l=>[...l,DEFAULT_LINK(nodes)]);setError('');};
-  const updateLink=(id,data)=>setLinks(l=>l.map(x=>x.id===id?data:x));
-  const deleteLink=(id)=>setLinks(l=>l.filter(x=>x.id!==id));
-  const generate=async()=>{
-    const valid=nodes.filter(n=>n.name.trim());
-    if(!valid.length){setError('Add at least one named node.');return;}
-    setLoading(true);setError('');setConfigs([]);
-    const results=[];
-    for(let i=0;i<valid.length;i++){
-      const node=valid[i];
-      setProgress(`Generating ${i+1}/${valid.length}: ${node.name}...`);
-      try{
-        const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:4096,system:buildSystemPrompt(global),messages:[{role:'user',content:buildUserPrompt(node,links,global)}]})});
-        const data=await res.json();
-        results.push({name:node.name,config:data.content?.[0]?.text||`# Error for ${node.name}`});
-      }catch(e){results.push({name:node.name,config:`# Error: ${e.message}`});}
+  _processEach(template, context) {
+    const eachRegex = /{{#each\s+(\w+)}}([\s\S]*?){{\/each}}/g;
+    return template.replace(eachRegex, (match, arrayName, block) => {
+      const array = this._getValue(context, arrayName);
+      if (!Array.isArray(array) || array.length === 0) return '';
+      return array.map((item, index) => {
+        const itemContext = { ...context, this: item, '@index': index };
+        return this.render(block, itemContext);
+      }).join('');
+    });
+  }
+
+  _processIf(template, context) {
+    const ifRegex = /{{#if\s+(\w+)}}([\s\S]*?){{\/if}}/g;
+    return template.replace(ifRegex, (match, condition, block) => {
+      const value = this._getValue(context, condition);
+      return this._isTruthy(value) ? this.render(block, context) : '';
+    });
+  }
+
+  _processVariables(template, context) {
+    const varRegex = /{{([^#/][^}]*)}}/g;
+    return template.replace(varRegex, (match, path) => {
+      const value = this._getValue(context, path.trim());
+      return value !== undefined && value !== null ? String(value) : '';
+    });
+  }
+
+  _getValue(context, path) {
+    if (path === 'this') return context.this || context;
+    const parts = path.split('.');
+    let current = context;
+    for (const part of parts) {
+      if (current === undefined || current === null) return undefined;
+      current = current[part];
     }
-    setConfigs(results);setLoading(false);setProgress('');setTab(3);
-  };
-  return(<div style={{display:'flex',flexDirection:'column',height:'100vh',background:G.bg}}>
-    <div style={{background:G.bg3,borderBottom:`1px solid ${G.border}`,padding:'10px 20px',display:'flex',alignItems:'center',gap:16,flexShrink:0}}>
-      <div>
-        <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:18,fontWeight:700,color:G.accent,letterSpacing:2,textShadow:`0 0 20px ${G.accent}88`}}>APEX<span style={{color:G.accent2}}>·</span>TOPOLOGY</div>
-        <div style={{fontSize:10,color:G.textMuted,letterSpacing:3,fontFamily:"'JetBrains Mono',monospace"}}>Nokia SR OS {global.srosVersion} · Config Generator</div>
-      </div>
-      <div style={{flex:1}}/>
-      <div style={{display:'flex',gap:10,alignItems:'center'}}>
-        <Badge color={G.green}>{nodes.filter(n=>n.name).length} nodes</Badge>
-        <Badge color={G.yellow}>{links.length} links</Badge>
-        <Button onClick={generate} style={{background:loading?G.bg4:G.green,border:`1px solid ${G.green}`,color:loading?G.textMuted:'#fff'}}>{loading?progress||'Generating...':'▶ GENERATE CONFIGS'}</Button>
-      </div>
-    </div>
-    {error&&<div style={{background:G.red+'22',border:`1px solid ${G.red}`,color:G.red,padding:'8px 20px',fontSize:12,fontFamily:"'JetBrains Mono',monospace"}}>⚠ {error}</div>}
-    <div style={{display:'flex',background:G.bg3,borderBottom:`1px solid ${G.border}`}}>
-      {TABS.map((t,i)=><button key={t} onClick={()=>setTab(i)} style={{background:tab===i?G.bg2:'transparent',border:'none',borderBottom:tab===i?`2px solid ${G.accent}`:'2px solid transparent',color:tab===i?G.accent:G.textMuted,cursor:'pointer',fontFamily:"'JetBrains Mono',monospace",fontSize:12,fontWeight:tab===i?700:400,padding:'10px 20px',letterSpacing:0.5}}>{t}{t==='OUTPUT'&&configs.length?` (${configs.length})`:''}</button>)}
-    </div>
-    <div style={{flex:1,overflow:'hidden'}}>
-      {tab===0&&<div style={{height:'100%',overflow:'auto',padding:16}}>
-        <div style={{display:'flex',alignItems:'center',marginBottom:14,gap:10}}><span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:G.textMuted,flex:1}}>Define ContainerLAB nodes. Each node generates a separate .cfg file.</span><Button onClick={addNode}>+ Add Node</Button></div>
-        {nodes.length===0&&<div style={{textAlign:'center',padding:60,color:G.textDim,fontFamily:"'JetBrains Mono',monospace",fontSize:13}}>No nodes yet.<br/><br/><Button onClick={addNode}>+ Add First Node</Button></div>}
-        {nodes.map(n=><NodeForm key={n.id} node={n} onChange={d=>updateNode(n.id,d)} onDelete={()=>deleteNode(n.id)}/>)}
-      </div>}
-      {tab===1&&<div style={{height:'100%',overflow:'auto',padding:16}}>
-        <div style={{display:'flex',alignItems:'center',marginBottom:14,gap:10}}><span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:G.textMuted,flex:1}}>Define links between nodes.</span><Button onClick={addLink}>+ Add Link</Button></div>
-        {links.length===0&&<div style={{textAlign:'center',padding:60,color:G.textDim,fontFamily:"'JetBrains Mono',monospace",fontSize:13}}>No links yet.{nodes.length<2&&' Add at least 2 nodes first.'}<br/><br/>{nodes.length>=2&&<Button onClick={addLink}>+ Add First Link</Button>}</div>}
-        {links.map(l=><LinkForm key={l.id} link={l} nodes={nodes} onChange={d=>updateLink(l.id,d)} onDelete={()=>deleteLink(l.id)}/>)}
-      </div>}
-      {tab===2&&<div style={{height:'100%',overflow:'auto',padding:16}}><GlobalConfig global={global} setGlobal={setGlobal}/></div>}
-      {tab===3&&<div style={{height:'100%',display:'flex',flexDirection:'column'}}>
-        {loading&&<div style={{padding:40,textAlign:'center',fontFamily:"'JetBrains Mono',monospace",color:G.accent,fontSize:13}}><div style={{marginBottom:16,fontSize:24}}>⚙</div>{progress||'Generating...'}</div>}
-        {!loading&&configs.length===0&&<div style={{padding:60,textAlign:'center',color:G.textDim,fontFamily:"'JetBrains Mono',monospace",fontSize:13}}>No configs yet.<br/><br/><Button onClick={()=>setTab(0)}>← Go to Nodes</Button></div>}
-        {!loading&&configs.length>0&&<OutputPanel configs={configs}/>}
-      </div>}
-    </div>
-    <div style={{background:G.bg3,borderTop:`1px solid ${G.border}`,padding:'6px 20px',display:'flex',justifyContent:'space-between',flexShrink:0}}>
-      <span style={{fontSize:11,color:G.textMuted,fontFamily:"'JetBrains Mono',monospace"}}>ApexTopology v0.2 · Nokia SR OS {global.srosVersion} · AI-Powered Config Generator</span>
-      <span style={{fontSize:11,color:G.textDim,fontFamily:"'JetBrains Mono',monospace"}}>ContainerLAB · TAC Lab Tool</span>
-    </div>
-  </div>);
+    return current;
+  }
+
+  _isTruthy(value) {
+    if (value === undefined || value === null || value === false) return false;
+    if (Array.isArray(value)) return value.length > 0;
+    if (typeof value === 'string') return value.trim().length > 0;
+    return Boolean(value);
+  }
 }
-ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
-  </script>
+    </script>
+    
+    <!-- Config Generator -->
+    <script>
+// Config Generator - Template-based SR OS config generator
+class ConfigGenerator {
+  constructor(hardwareDB) {
+    this.hardwareDB = hardwareDB;
+    this.engine = new TemplateEngine();
+  }
+
+  generateAll(input) {
+    const files = [];
+    const { global, nodes, links } = input;
+
+    // Generate individual node configs
+    nodes.forEach((node, index) => {
+      const config = this.generateNodeConfig(node, index, global, nodes, links);
+      files.push({ name: `${node.name}.sros.cfg`, code: config });
+    });
+
+    // Generate ContainerLab topology
+    const clabConfig = this.generateContainerLabConfig(global, nodes, links);
+    files.push({ name: 'clab.yml', code: clabConfig });
+
+    return files;
+  }
+
+  generateNodeConfig(node, nodeIndex, global, allNodes, links) {
+    const sections = [];
+    const systemIP = this._generateSystemIP(global.ipPool, nodeIndex);
+    
+    // Base config
+    sections.push(`# TiMOS-B-${global.srosVersion} ${node.nodeType} ${node.name}
+# Generated by ApexTopology v0.3
+# Topology: ${global.labName}
+
+configure
+    system
+        name "${node.name}"
+        location "${global.labName}"
+        security
+            user-params
+                local-user
+                    user "admin"
+                        password "$2y$10$TQrZlpBDra86.qoexZUzQe"
+                        access console ftp snmp netconf grpc
+                        console
+                            member ["administrative"]
+                        exit
+                    exit
+                exit
+            exit
+        exit
+    exit`);
+
+    // System interface
+    sections.push(`    router Base
+        interface "system"
+            address ${systemIP}/32
+            loopback
+            no shutdown
+        exit
+    exit`);
+
+    // P2P Interfaces
+    const nodeLinks = this._getNodeLinks(node.name, links);
+    nodeLinks.forEach((link, idx) => {
+      const interfaceConfig = this._renderP2PInterface(link, node.name, global.ipPool, nodeIndex, idx);
+      sections.push(interfaceConfig);
+    });
+
+    // IGP
+    if (node.igp === 'OSPF' && nodeLinks.length > 0) {
+      const ospfIfaces = nodeLinks.map(l => 
+        `                interface "${l.nodeA === node.name ? l.ifaceA : l.ifaceB}"
+                    interface-type point-to-point
+                    no shutdown
+                exit`
+      ).join('\n');
+      
+      sections.push(`    router Base
+        ospf 0
+            area 0.0.0.0
+                interface "system"
+                    no shutdown
+                exit
+${ospfIfaces}
+            exit
+            no shutdown
+        exit
+    exit`);
+    } else if (node.igp === 'ISIS' && nodeLinks.length > 0) {
+      const isisIfaces = nodeLinks.map(l => 
+        `            interface "${l.nodeA === node.name ? l.ifaceA : l.ifaceB}"
+                interface-type point-to-point
+                level-capability level-2
+                no shutdown
+            exit`
+      ).join('\n');
+      
+      sections.push(`    router Base
+        isis 0
+            area-id 49.0001
+            level-capability level-2
+            interface "system"
+                ipv4-node-sid
+                    index ${nodeIndex + 1}
+                exit
+                no shutdown
+            exit
+${isisIfaces}
+            no shutdown
+        exit
+    exit`);
+    }
+
+    // MPLS/LDP
+    if (node.mpls && node.mpls.includes('LDP') && nodeLinks.length > 0) {
+      const ldpIfaces = nodeLinks.map(l => 
+        `                interface "${l.nodeA === node.name ? l.ifaceA : l.ifaceB}"
+                    ipv4
+                        no shutdown
+                    exit
+                exit`
+      ).join('\n');
+      
+      sections.push(`    router Base
+        ldp
+            interface-parameters
+${ldpIfaces}
+            exit
+            no shutdown
+        exit
+    exit`);
+    }
+
+    // BGP
+    const asNumber = global.asNumber || 65000;
+    if (node.bgpRole === 'IBGP Route Reflector') {
+      const rrClients = allNodes
+        .filter(n => n.bgpRole === 'IBGP Peer' && n.name !== node.name)
+        .map((n, idx) => {
+          const peerIP = this._generateSystemIP(global.ipPool, allNodes.indexOf(n));
+          return `                neighbor ${peerIP}
+                    description "${n.name}"
+                exit`;
+        }).join('\n');
+      
+      sections.push(`    router Base
+        autonomous-system ${asNumber}
+        bgp
+            router-id ${systemIP}
+            group "RR-CLIENTS"
+                family vpn-ipv4 vpn-ipv6
+                cluster
+                    cluster-id ${systemIP}
+                exit
+${rrClients}
+            exit
+            no shutdown
+        exit
+    exit`);
+    } else if (node.bgpRole === 'IBGP Peer') {
+      const ibgpPeers = allNodes
+        .filter(n => n.bgpRole === 'IBGP Route Reflector')
+        .map((n) => {
+          const peerIP = this._generateSystemIP(global.ipPool, allNodes.indexOf(n));
+          return `                neighbor ${peerIP}
+                    description "${n.name}"
+                exit`;
+        }).join('\n');
+      
+      sections.push(`    router Base
+        autonomous-system ${asNumber}
+        bgp
+            router-id ${systemIP}
+            group "IBGP"
+                family vpn-ipv4 vpn-ipv6
+${ibgpPeers}
+            exit
+            no shutdown
+        exit
+    exit`);
+    }
+
+    // Services
+    if (node.service === 'VPRN') {
+      const serviceId = 100 + nodeIndex;
+      sections.push(`    service
+        vprn ${serviceId} customer 1 create
+            description "VPRN Service ${serviceId}"
+            autonomous-system ${asNumber}
+            route-distinguisher ${systemIP}:${serviceId}
+            vrf-target target:${asNumber}:${serviceId}
+            interface "customer-1" create
+                ipv4
+                    primary
+                        address 192.168.${nodeIndex}.1
+                        prefix-length 24
+                    exit
+                exit
+                sap 1/1/1:100 create
+                exit
+            exit
+            no shutdown
+        exit
+    exit`);
+    }
+
+    sections.push('exit all');
+    return sections.filter(s => s).join('\n\n');
+  }
+
+  _renderP2PInterface(link, nodeName, ipPool, nodeIndex, linkIndex) {
+    const isNodeA = link.nodeA === nodeName;
+    const interfaceName = isNodeA ? link.ifaceA : link.ifaceB;
+    const portId = this._interfaceNameToPort(interfaceName);
+    const { ipA, ipB, prefixLength } = this._generateLinkIPs(ipPool, nodeIndex, linkIndex);
+    const ipAddress = isNodeA ? ipA : ipB;
+
+    return `    port ${portId}
+        ethernet
+            mode network
+            encap-type dot1q
+        exit
+        no shutdown
+    exit
+    router Base
+        interface "${interfaceName}"
+            port ${portId}:0
+            ipv4
+                primary
+                    address ${ipAddress}
+                    prefix-length ${prefixLength}
+                exit
+            exit
+            no shutdown
+        exit
+    exit`;
+  }
+
+  generateContainerLabConfig(global, nodes, links) {
+    const nodeSection = nodes.map(node => 
+      `    ${node.name}:
+      kind: nokia_sros
+      type: ${node.nodeType.toLowerCase()}
+      image: vrnetlab/nokia_sros:${global.srosVersion}
+      startup-config: ${node.name}.sros.cfg`
+    ).join('\n');
+
+    const linkSection = links
+      .filter(link => link.nodeA && link.nodeB && link.ifaceA && link.ifaceB)
+      .map(link => `    - endpoints: ["${link.nodeA}:${link.ifaceA}", "${link.nodeB}:${link.ifaceB}"]`)
+      .join('\n');
+
+    return `name: ${global.labName}
+
+topology:
+  nodes:
+${nodeSection}
+
+  links:
+${linkSection}`;
+  }
+
+  _interfaceNameToPort(interfaceName) {
+    const match = interfaceName.match(/\d+\/\d+\/\d+/);
+    return match ? match[0] : '1/1/1';
+  }
+
+  _generateSystemIP(ipPool, index) {
+    const baseIP = ipPool.split('/')[0].split('.').map(Number);
+    baseIP[3] = index + 1;
+    return baseIP.join('.');
+  }
+
+  _generateLinkIPs(ipPool, nodeIndex, linkIndex) {
+    const baseIP = ipPool.split('/')[0].split('.').map(Number);
+    const subnet = 100 + (nodeIndex * 10) + linkIndex;
+    return {
+      ipA: `${baseIP[0]}.${baseIP[1]}.${subnet}.1`,
+      ipB: `${baseIP[0]}.${baseIP[1]}.${subnet}.2`,
+      prefixLength: 30,
+    };
+  }
+
+  _getNodeLinks(nodeName, allLinks) {
+    return allLinks.filter(link => link.nodeA === nodeName || link.nodeB === nodeName);
+  }
+}
+    </script>
+
+    <!-- React App -->
+    <script type="text/babel">
+const { useState, useRef } = React;
+
+// Styles
+const G = {
+  bg: "#1e1e1e", panel: "#252526", card: "#2d2d30", border: "#3e3e42",
+  accent: "#007acc", accent2: "#4ec9b0", accent3: "#ce9178",
+  textPrimary: "#cccccc", textSecondary: "#9cdcfe", textMuted: "#6a6a6a",
+  success: "#4ec9b0", warning: "#dcdcaa", error: "#f48771",
+};
+
+const css = `
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Segoe+UI:wght@300;400;600;700&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:${G.bg};color:${G.textPrimary};font-family:'Segoe UI',sans-serif;}
+  ::-webkit-scrollbar{width:8px;height:8px;}
+  ::-webkit-scrollbar-track{background:${G.panel};}
+  ::-webkit-scrollbar-thumb{background:${G.border};border-radius:4px;}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
+  @keyframes spin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
+`;
+
+const NODE_TYPES = ["7750SR", "7250IXR", "7950XRS", "7210SAS", "VSR", "Linux"];
+const IGP_OPTIONS = ["OSPF", "ISIS", "None"];
+const BGP_ROLES = ["IBGP Route Reflector", "IBGP Peer", "EBGP Peer", "None"];
+const SERVICE_TYPES = ["VPRN", "L3VPN", "VPLS", "None"];
+
+// Hardware DB - Embedded minimal version
+const HARDWARE_DB = {
+  "source": {
+    "title": "SR-SIM Installation, Setup, and Deployment Guide",
+    "release": "25.10.R1"
+  },
+  "chassis": {
+    "IXR-6": {
+      "sfmCpmTypes": ["None", "cpm-ixr", "sfm-ixr-6"],
+      "iomCardTypes": ["None", "imm36-100g-qsfp28", "imm48-sfp+2-qsfp28"],
+      "mdaTypes": ["None", "m36-100g-qsfp28", "m48-sfp+2-qsfp28"]
+    },
+    "7750SR-12": {
+      "sfmCpmTypes": ["None", "cpm5"],
+      "iomCardTypes": ["None", "iom3-xp-c"],
+      "mdaTypes": ["None", "m10-1gb-sfp+"]
+    },
+    "7950XRS-20": {
+      "sfmCpmTypes": ["None", "cpm-xrs"],
+      "iomCardTypes": ["None", "iom-xrs-20e"],
+      "mdaTypes": ["None", "m20-1gb-xp-sfp"]
+    }
+  }
+};
+
+// Components
+const Btn = ({ onClick, children, disabled, variant = "default", style = {} }) => (
+  <button onClick={onClick} disabled={disabled} style={{
+    padding: "6px 14px", borderRadius: 6, border: "none", cursor: disabled ? "default" : "pointer",
+    fontFamily: "'JetBrains Mono',monospace", fontSize: 11, letterSpacing: 1,
+    background: variant === "success" ? G.success : variant === "primary" ? G.accent : G.card,
+    color: variant === "default" ? G.textSecondary : G.bg,
+    opacity: disabled ? .5 : 1, transition: "all .2s", ...style
+  }}>
+    {children}
+  </button>
+);
+
+const Input = ({ value, onChange, placeholder = "", mono = false }) => (
+  <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} style={{
+    background: G.panel, border: `1px solid ${G.border}`, borderRadius: 6, padding: "8px 12px",
+    color: G.textPrimary, fontSize: 12, fontFamily: mono ? "'JetBrains Mono',monospace" : "'Segoe UI',sans-serif",
+    outline: "none", width: "100%"
+  }} />
+);
+
+const Select = ({ value, onChange, options }) => (
+  <select value={value} onChange={e => onChange(e.target.value)} style={{
+    background: G.panel, border: `1px solid ${G.border}`, borderRadius: 6, padding: "8px 12px",
+    color: G.textPrimary, fontSize: 12, fontFamily: "'JetBrains Mono',monospace", outline: "none", width: "100%"
+  }}>
+    {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+  </select>
+);
+
+const Label = ({ children }) => (
+  <div style={{ fontSize: 11, color: G.textMuted, marginBottom: 6, letterSpacing: 1, fontFamily: "'JetBrains Mono',monospace" }}>
+    {children}
+  </div>
+);
+
+const Badge = ({ children, color = G.accent }) => (
+  <div style={{ display: "inline-block", padding: "4px 10px", background: color + "22", color, borderRadius: 4, fontSize: 10, fontFamily: "'JetBrains Mono',monospace", letterSpacing: 1.5 }}>
+    {children}
+  </div>
+);
+
+const CodeBlock = ({ filename, code }) => {
+  const copy = () => { navigator.clipboard.writeText(code); };
+  return (
+    <div style={{ marginBottom: 16, background: G.card, border: `1px solid ${G.border}`, borderRadius: 10, overflow: "hidden" }}>
+      <div style={{ background: G.panel, padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `1px solid ${G.border}` }}>
+        <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, color: G.accent }}>{filename}</div>
+        <Btn onClick={copy}>COPY</Btn>
+      </div>
+      <pre style={{ padding: 16, margin: 0, overflowX: "auto", fontFamily: "'JetBrains Mono',monospace", fontSize: 11, lineHeight: 1.6, color: G.textSecondary, maxHeight: 500 }}>
+        {code}
+      </pre>
+    </div>
+  );
+};
+
+// Node Editor
+const NodeEditor = ({ node, index, onChange, onDelete }) => (
+  <div style={{ background: G.card, border: `1px solid ${G.border}`, borderRadius: 10, padding: 16, marginBottom: 12 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+      <div style={{ fontSize: 14, fontWeight: 600, color: G.accent, fontFamily: "'JetBrains Mono',monospace" }}>
+        NODE {index + 1}
+      </div>
+      <div style={{ flex: 1 }} />
+      <Btn onClick={onDelete} variant="default">✕ DELETE</Btn>
+    </div>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+      <div><Label>Name</Label><Input value={node.name} onChange={v => onChange({ ...node, name: v })} mono /></div>
+      <div><Label>Type</Label><Select value={node.nodeType} onChange={v => onChange({ ...node, nodeType: v })} options={NODE_TYPES} /></div>
+      <div><Label>IGP</Label><Select value={node.igp} onChange={v => onChange({ ...node, igp: v })} options={IGP_OPTIONS} /></div>
+      <div><Label>BGP Role</Label><Select value={node.bgpRole} onChange={v => onChange({ ...node, bgpRole: v })} options={BGP_ROLES} /></div>
+      <div><Label>Service</Label><Select value={node.service} onChange={v => onChange({ ...node, service: v })} options={SERVICE_TYPES} /></div>
+      <div><Label>MPLS</Label><Input value={node.mpls || ""} onChange={v => onChange({ ...node, mpls: v })} placeholder="LDP,RSVP" mono /></div>
+    </div>
+  </div>
+);
+
+// Link Editor
+const LinkEditor = ({ link, nodes, onChange, onDelete }) => (
+  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr auto", gap: 8, marginBottom: 8, alignItems: "center" }}>
+    <Select value={link.nodeA} onChange={v => onChange({ ...link, nodeA: v })} options={["", ...nodes.map(n => n.name)]} />
+    <Input value={link.ifaceA} onChange={v => onChange({ ...link, ifaceA: v })} placeholder="1/1/1" mono />
+    <Select value={link.nodeB} onChange={v => onChange({ ...link, nodeB: v })} options={["", ...nodes.map(n => n.name)]} />
+    <Input value={link.ifaceB} onChange={v => onChange({ ...link, ifaceB: v })} placeholder="1/1/1" mono />
+    <Select value={link.type} onChange={v => onChange({ ...link, type: v })} options={["Link", "LAG", "None"]} />
+    <Btn onClick={onDelete}>✕</Btn>
+  </div>
+);
+
+// Default values
+const defaultNode = (id) => ({
+  id, name: `R${id}`, nodeType: "7750SR", igp: "ISIS",
+  bgpRole: "None", service: "None", mpls: "LDP"
+});
+
+const defaultLink = (id) => ({
+  id, nodeA: "", nodeB: "", ifaceA: "", ifaceB: "", type: "Link"
+});
+
+// Main App
+function App() {
+  const [tab, setTab] = useState("topology");
+  const [nodes, setNodes] = useState([defaultNode(1), defaultNode(2)]);
+  const [links, setLinks] = useState([defaultLink(1)]);
+  const [global, setGlobal] = useState({ labName: "nokia-lab", srosVersion: "25.10.R3", ipPool: "10.0.0.0/8", asNumber: 65000 });
+  const [loading, setLoading] = useState(false);
+  const [output, setOutput] = useState(null);
+  const [error, setError] = useState(null);
+  const nodeId = useRef(3);
+  const linkId = useRef(2);
+
+  const addNode = () => { setNodes(p => [...p, defaultNode(nodeId.current++)]); };
+  const delNode = (i) => setNodes(p => p.filter((_, j) => j !== i));
+  const updNode = (i, n) => setNodes(p => p.map((x, j) => j === i ? n : x));
+  const addLink = () => { setLinks(p => [...p, defaultLink(linkId.current++)]); };
+  const delLink = (i) => setLinks(p => p.filter((_, j) => j !== i));
+  const updLink = (i, l) => setLinks(p => p.map((x, j) => j === i ? l : x));
+
+  const generate = () => {
+    if (nodes.length === 0) return;
+    setLoading(true);
+    setError(null);
+    setOutput(null);
+    setTab("output");
+
+    setTimeout(() => {
+      try {
+        const generator = new ConfigGenerator(HARDWARE_DB);
+        const files = generator.generateAll({ global, nodes, links });
+        setOutput({ files });
+      } catch (e) {
+        setError(e.message);
+      } finally {
+        setLoading(false);
+      }
+    }, 300);
+  };
+
+  const downloadAll = () => {
+    if (!output) return;
+    output.files.forEach(f => {
+      const blob = new Blob([f.code], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = f.name; a.click();
+      URL.revokeObjectURL(url);
+    });
+  };
+
+  const TABS = [
+    { id: "topology", label: "NODES", icon: "◈", count: nodes.length },
+    { id: "links", label: "LINKS", icon: "⟷", count: links.filter(l => l.nodeA && l.nodeB).length },
+    { id: "global", label: "GLOBAL", icon: "⚙", count: null },
+    { id: "output", label: "OUTPUT", icon: "◉", count: output ? output.files.length : null },
+  ];
+
+  return (
+    <div style={{ minHeight: "100vh", background: G.bg, display: "flex", flexDirection: "column" }}>
+      <style>{css}</style>
+      
+      {/* Header */}
+      <div style={{ background: G.panel, borderBottom: `1px solid ${G.border}`, padding: "14px 24px", display: "flex", alignItems: "center", gap: 16 }}>
+        <div>
+          <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 20, fontWeight: 700, color: G.accent, letterSpacing: 2 }}>
+            ApexTopology
+          </div>
+          <div style={{ fontSize: 10, color: G.textMuted, letterSpacing: 2, fontFamily: "'JetBrains Mono',monospace" }}>
+            Nokia SR OS Config Generator v0.3 · Template-Based
+          </div>
+        </div>
+        <div style={{ marginLeft: "auto", display: "flex", gap: 10 }}>
+          <Badge color={G.accent}>ContainerLAB</Badge>
+          <Badge color={G.success}>Template Engine</Badge>
+          <Btn onClick={generate} disabled={loading || nodes.length === 0} variant="success" style={{ padding: "8px 20px" }}>
+            {loading ? "GENERATING..." : "▶ GENERATE CONFIGS"}
+          </Btn>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div style={{ background: G.panel, borderBottom: `1px solid ${G.border}`, display: "flex", gap: 2, padding: "0 24px" }}>
+        {TABS.map(t => (
+          <div key={t.id} onClick={() => setTab(t.id)} style={{
+            padding: "12px 20px", cursor: "pointer", fontSize: 12, fontFamily: "'JetBrains Mono',monospace",
+            letterSpacing: 1.5, color: tab === t.id ? G.accent : G.textSecondary,
+            borderBottom: tab === t.id ? `2px solid ${G.accent}` : "2px solid transparent",
+            transition: "all .2s", display: "flex", alignItems: "center", gap: 8
+          }}>
+            <span>{t.icon}</span>
+            {t.label}
+            {t.count !== null && <Badge color={tab === t.id ? G.accent : G.textMuted}>{t.count}</Badge>}
+          </div>
+        ))}
+      </div>
+
+      {/* Content */}
+      <div style={{ flex: 1, padding: 24, overflowY: "auto" }}>
+        {tab === "topology" && (
+          <div style={{ animation: "fadeIn .2s ease" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 600 }}>Node Configuration</div>
+                <div style={{ fontSize: 12, color: G.textSecondary, marginTop: 2 }}>Define routers in your topology</div>
+              </div>
+              <Btn onClick={addNode} variant="primary">+ ADD NODE</Btn>
+            </div>
+            {nodes.length === 0 && (
+              <div style={{ textAlign: "center", padding: "60px 0", color: G.textMuted }}>
+                <div style={{ fontSize: 32, marginBottom: 12 }}>◈</div>
+                <div>No nodes. Add one to start.</div>
+              </div>
+            )}
+            {nodes.map((n, i) => (
+              <NodeEditor key={n.id} node={n} index={i} onChange={v => updNode(i, v)} onDelete={() => delNode(i)} />
+            ))}
+          </div>
+        )}
+
+        {tab === "links" && (
+          <div style={{ animation: "fadeIn .2s ease" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 600 }}>Links / Connections</div>
+                <div style={{ fontSize: 12, color: G.textSecondary, marginTop: 2 }}>Define connections between nodes</div>
+              </div>
+              <Btn onClick={addLink} variant="primary">+ ADD LINK</Btn>
+            </div>
+            <div style={{ background: G.card, border: `1px solid ${G.border}`, borderRadius: 10, padding: 16 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr auto", gap: 8, marginBottom: 10 }}>
+                {["Node A", "Iface A", "Node B", "Iface B", "Type", ""].map((h, i) => (
+                  <div key={i} style={{ fontSize: 10, color: G.textMuted, fontFamily: "'JetBrains Mono',monospace" }}>{h}</div>
+                ))}
+              </div>
+              {links.length === 0 && (
+                <div style={{ textAlign: "center", padding: "30px 0", color: G.textMuted }}>No links defined.</div>
+              )}
+              {links.map((l, i) => (
+                <LinkEditor key={l.id} link={l} nodes={nodes} onChange={v => updLink(i, v)} onDelete={() => delLink(i)} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {tab === "global" && (
+          <div style={{ animation: "fadeIn .2s ease", maxWidth: 640 }}>
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 16, fontWeight: 600 }}>Global Parameters</div>
+              <div style={{ fontSize: 12, color: G.textSecondary, marginTop: 2 }}>Lab-wide configuration</div>
+            </div>
+            <div style={{ background: G.card, border: `1px solid ${G.border}`, borderRadius: 10, padding: 20, display: "grid", gap: 16 }}>
+              <div><Label>Lab Name</Label><Input value={global.labName} onChange={v => setGlobal(p => ({ ...p, labName: v }))} /></div>
+              <div><Label>SR OS Version</Label>
+                <Select value={global.srosVersion} onChange={v => setGlobal(p => ({ ...p, srosVersion: v }))} 
+                  options={["23.3.R2", "23.7.R1", "24.3.R2", "24.10.R1", "25.3.R1", "25.10.R3"]} />
+              </div>
+              <div><Label>IP Pool</Label><Input value={global.ipPool} onChange={v => setGlobal(p => ({ ...p, ipPool: v }))} mono /></div>
+              <div><Label>AS Number</Label><Input value={global.asNumber} onChange={v => setGlobal(p => ({ ...p, asNumber: parseInt(v) || 65000 }))} mono /></div>
+            </div>
+          </div>
+        )}
+
+        {tab === "output" && (
+          <div style={{ animation: "fadeIn .2s ease" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 600 }}>Generated Files</div>
+                <div style={{ fontSize: 12, color: G.textSecondary, marginTop: 2 }}>
+                  {loading ? "Generating..." : output ? `${output.files.length} files ready` : "Press GENERATE to start"}
+                </div>
+              </div>
+              {output && <Btn onClick={downloadAll} variant="success">↓ DOWNLOAD ALL</Btn>}
+            </div>
+
+            {loading && (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 20, padding: "60px 0" }}>
+                <div style={{ width: 60, height: 60, border: `3px solid ${G.border}`, borderTopColor: G.accent, borderRadius: "50%", animation: "spin .9s linear infinite" }} />
+                <div style={{ fontFamily: "'JetBrains Mono',monospace", color: G.accent, fontSize: 13 }}>Generating configs...</div>
+              </div>
+            )}
+
+            {error && (
+              <div style={{ background: G.error + "11", border: `1px solid ${G.error}44`, borderRadius: 10, padding: 20 }}>
+                <div style={{ color: G.error, fontWeight: 600 }}>Generation Error</div>
+                <div style={{ color: G.textSecondary, fontSize: 13, marginTop: 4 }}>{error}</div>
+              </div>
+            )}
+
+            {output && !loading && (
+              <div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+                  {output.files.map(f => (
+                    <Badge key={f.name} color={f.name.includes("clab") ? G.accent3 : G.accent}>{f.name}</Badge>
+                  ))}
+                </div>
+                {output.files.map(f => (
+                  <CodeBlock key={f.name} filename={f.name} code={f.code} />
+                ))}
+              </div>
+            )}
+
+            {!loading && !output && !error && (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16, padding: "60px 0", color: G.textMuted }}>
+                <div style={{ fontSize: 48 }}>◉</div>
+                <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 13 }}>Configure nodes and press GENERATE</div>
+                <div style={{ fontSize: 11, maxWidth: 400, textAlign: "center" }}>
+                  Template-based generator produces deterministic, production-ready SR OS configs
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div style={{ background: G.panel, borderTop: `1px solid ${G.border}`, padding: "8px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span style={{ fontSize: 11, color: G.textMuted, fontFamily: "'JetBrains Mono',monospace" }}>
+          ApexTopology v0.3 · Template Engine · No AI Required
+        </span>
+        <span style={{ fontSize: 11, color: G.success, fontFamily: "'JetBrains Mono',monospace" }}>✓ DETERMINISTIC</span>
+      </div>
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+    </script>
 </body>
 </html>
