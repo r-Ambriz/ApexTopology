@@ -1176,6 +1176,22 @@ function hwLimits(node) {
   return { maxCards: IOM_SLOTS[model] || 1, maxMdas: 2 };     // distributed
 }
 
+// SR-s chassis (SR-1s/1se/2s/2se/7s/14s) ship an integrated power shelf that must
+// be declared in the config. Matches "SR-<n>s" and "SR-<n>se".
+function chassisNeedsPowerShelf(model) {
+  return /^SR-\d+se?$/.test(String(model || ""));
+}
+
+// Default power-shelf settings applied when a chassis is selected.
+function powerShelfDefaults(model) {
+  return {
+    powerShelf: chassisNeedsPowerShelf(model),
+    powerShelfType: "ps-a4-shelf-dc",
+    powerModuleType: "ps-a-dc-6000",
+    powerModules: 4,
+  };
+}
+
 // Breakout-capable connector families named in an MDA type (e.g. "…qsfp28").
 function connectorFamilies(mdaType) {
   const s = String(mdaType || "").toLowerCase();
@@ -1199,15 +1215,47 @@ function breakoutOptionsFor(mdaType) {
   return ["None", ...out];
 }
 
-// Resolve the MDA type serving a port id (card slot + mda slot before the cX connector).
+// Resolve the MDA type serving a port id, for both connector-style (L/M/cC/P)
+// and direct-style (L/M/P) port names.
 function mdaTypeForPort(node, portName) {
   const parts = String(portName || "").split("/");
   const ci = parts.findIndex(p => /^c\d+$/.test(p));
-  if (ci < 1) return null;
-  const card = (node.cards || []).find(c => String(c.slot) === String(parts[0]));
+  const cardSlot = parts[0];
+  const mdaSlot = ci !== -1 ? parts[ci - 1] : parts[1];
+  if (!cardSlot || !mdaSlot) return null;
+  const card = (node.cards || []).find(c => String(c.slot) === String(cardSlot));
   if (!card) return null;
-  const mda = (card.mdas || []).find(m => String(m.slot) === String(parts[ci - 1]));
+  const mda = (card.mdas || []).find(m => String(m.slot) === String(mdaSlot));
   return mda ? mda.type : null;
+}
+
+// Port-naming style for an MDA: connector-based (QSFP/CFP -> L/M/cC/P) vs direct
+// SFP ports (L/M/P). Unknown/None defaults to connector.
+function mdaPortStyle(mdaType) {
+  if (!mdaType || mdaType === "None") return "connector";
+  return connectorFamilies(mdaType).length ? "connector" : "direct";
+}
+
+// Rebuild a port id in the given style, preserving card/mda slots + port number.
+function convertPortStyle(portId, style) {
+  const parts = String(portId || "").split("/");
+  const ci = parts.findIndex(p => /^c\d+$/.test(p));
+  const card = parts[0];
+  const mda = ci !== -1 ? parts[ci - 1] : parts[1];
+  const num = ci !== -1 ? parts[ci].slice(1) : (parts[2] || "1");
+  if (!card || !mda) return portId;
+  return style === "direct" ? `${card}/${mda}/${num}` : `${card}/${mda}/c${num}/1`;
+}
+
+// Next default port id for a node, in the style of its first configured MDA.
+function nextPortId(node) {
+  let cardSlot = "1", mdaSlot = "1", mdaType = null;
+  for (const c of (node.cards || [])) {
+    const m = (c.mdas || []).find(x => x.type && x.type !== "None");
+    if (m) { cardSlot = c.slot; mdaSlot = m.slot; mdaType = m.type; break; }
+  }
+  const n = (node.interfaces || []).length + 1;
+  return mdaPortStyle(mdaType) === "direct" ? `${cardSlot}/${mdaSlot}/${n}` : `${cardSlot}/${mdaSlot}/c${n}/1`;
 }
 
 // Hardware default: one line card in slot 1 with one MDA in slot 1, no CPM/SFM.
@@ -1222,6 +1270,10 @@ const defaultNode = (id, num = id) => ({
   chassisModel: "None",
   systemIp: `10.0.0.${num}/32`,
   includeSystem: true,
+  powerShelf: false,
+  powerShelfType: "ps-a4-shelf-dc",
+  powerModuleType: "ps-a-dc-6000",
+  powerModules: 4,
   cpms: [],
   cards: defaultCards(),
   asn: "65000",
@@ -1410,8 +1462,8 @@ function NodeEditor({ node, onChange, onDelete, index }) {
   const integrated = chassisIsIntegrated(node);
   const limits = hwLimits(node);
   // Changing platform/chassis invalidates prior card selections -> reset to a clean default.
-  const setPlatform = (type) => onChange({ ...node, type, chassisModel: "None", cpms: [], cards: defaultCards() });
-  const setChassisModel = (chassisModel) => onChange({ ...node, chassisModel, cpms: [], cards: defaultCards() });
+  const setPlatform = (type) => onChange({ ...node, type, chassisModel: "None", cpms: [], cards: defaultCards(), powerShelf: false });
+  const setChassisModel = (chassisModel) => onChange({ ...node, chassisModel, cpms: [], cards: defaultCards(), ...powerShelfDefaults(chassisModel) });
 
   const updIface = (i, k, v) => {
     const ifaces = [...node.interfaces];
@@ -1423,7 +1475,8 @@ function NodeEditor({ node, onChange, onDelete, index }) {
     ifaces[i] = { ...ifaces[i], ...patch };
     upd("interfaces", ifaces);
   };
-  const addIface = () => upd("interfaces", [...node.interfaces, { name: "", vlan: "", ip: "", role: "network", encap: "null", breakout: "None", ifaceName: "" }]);
+  // New interfaces default to a port id in the current MDA's naming style.
+  const addIface = () => upd("interfaces", [...node.interfaces, { name: nextPortId(node), vlan: "", ip: "", role: "network", encap: "null", breakout: "None", ifaceName: "" }]);
   const delIface = (i) => upd("interfaces", node.interfaces.filter((_, j) => j !== i));
 
   // ── CPM/SFM module handlers ──
@@ -1441,6 +1494,25 @@ function NodeEditor({ node, onChange, onDelete, index }) {
   const addMda = (ci) => upd("cards", cards.map((c, j) => j === ci ? { ...c, mdas: [...(c.mdas || []), { slot: String((c.mdas || []).length + 1), type: "None" }] } : c));
   const updMda = (ci, mi, k, v) => upd("cards", cards.map((c, j) => j === ci ? { ...c, mdas: c.mdas.map((m, mj) => mj === mi ? { ...m, [k]: v } : m) } : c));
   const delMda = (ci, mi) => upd("cards", cards.map((c, j) => j === ci ? { ...c, mdas: c.mdas.filter((_, mj) => mj !== mi) } : c));
+  // Changing an MDA type also re-styles the port id of interfaces on that card+MDA
+  // (connector L/M/cC/P for QSFP, direct L/M/P for SFP).
+  const setMdaType = (ci, mi, newType) => {
+    const newCards = cards.map((c, j) => j === ci ? { ...c, mdas: c.mdas.map((m, mj) => mj === mi ? { ...m, type: newType } : m) } : c);
+    const cardSlot = String(cards[ci].slot);
+    const mdaSlot = String(cards[ci].mdas[mi].slot);
+    const style = mdaPortStyle(newType);
+    const interfaces = (node.interfaces || []).map(intf => {
+      if (!intf.name) return intf;
+      const parts = String(intf.name).split("/");
+      const cidx = parts.findIndex(p => /^c\d+$/.test(p));
+      const iMda = cidx !== -1 ? parts[cidx - 1] : parts[1];
+      if (String(parts[0]) === cardSlot && String(iMda) === mdaSlot) {
+        return { ...intf, name: convertPortStyle(intf.name, style) };
+      }
+      return intf;
+    });
+    onChange({ ...node, cards: newCards, interfaces });
+  };
 
   return (
     <div style={{ border: `1px solid ${open ? G.accent : G.border}`, borderRadius: 0, marginBottom: 8, overflow: "hidden", transition: "all .2s" }}>
@@ -1511,7 +1583,7 @@ function NodeEditor({ node, onChange, onDelete, index }) {
                 {(card.mdas || []).map((m, mi) => (
                   <div key={mi} style={{ display: "grid", gridTemplateColumns: "0.6fr 3fr auto", gap: 8, paddingLeft: integrated ? 0 : 18 }}>
                     <Input value={m.slot} onChange={v => updMda(ci, mi, "slot", v)} placeholder="1" mono />
-                    <Select value={hardwareOptions.mdaTypes.includes(m.type) ? m.type : "None"} onChange={v => updMda(ci, mi, "type", v)} options={hardwareOptions.mdaTypes} />
+                    <Select value={hardwareOptions.mdaTypes.includes(m.type) ? m.type : "None"} onChange={v => setMdaType(ci, mi, v)} options={hardwareOptions.mdaTypes} />
                     <Btn onClick={() => delMda(ci, mi)} variant="danger" style={{ padding: "3px 8px", fontSize: 11 }}>✕</Btn>
                   </div>
                 ))}
@@ -1521,6 +1593,17 @@ function NodeEditor({ node, onChange, onDelete, index }) {
                 </div>
               </div>
             ))}
+          </div>
+          {/* Power shelf — auto-enabled for SR-s chassis, editable. */}
+          <div style={{ border: `1px solid ${G.border}`, padding: 10, display: "grid", gap: 10 }}>
+            <Toggle value={!!node.powerShelf} onChange={v => upd("powerShelf", v)} label="Power shelf (required on SR-s chassis: SR-1s/2s/7s/14s)" />
+            {node.powerShelf && (
+              <div style={{ display: "grid", gridTemplateColumns: "2fr 2fr 1fr", gap: 10 }}>
+                <div><Label>Power Shelf Type</Label><Input value={node.powerShelfType} onChange={v => upd("powerShelfType", v)} placeholder="ps-a4-shelf-dc" mono /></div>
+                <div><Label>Power Module Type</Label><Input value={node.powerModuleType} onChange={v => upd("powerModuleType", v)} placeholder="ps-a-dc-6000" mono /></div>
+                <div><Label># Modules</Label><Input value={String(node.powerModules ?? 4)} onChange={v => upd("powerModules", v)} placeholder="4" mono /></div>
+              </div>
+            )}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
             <div><Label>IGP Protocol</Label><Select value={node.igp} onChange={v => upd("igp", v)} options={IGP_OPTIONS} /></div>
@@ -1686,22 +1769,14 @@ function isDistributedNode(node) {
 }
 
 // ── SR OS classic-CLI section builders ────────────────────────────────────────
+// Only line cards + MDAs are provisioned in the SR OS config. CPM/SFM modules
+// are NOT declared here — they are set via Containerlab components/env only.
 function srosCardConfig(node) {
-  const cpms = nodeCpms(node);
   const cards = nodeCards(node);
-  if (!cpms.length && !cards.length) return null; // rely on containerlab defaults
+  if (!cards.length) return null; // rely on containerlab defaults
   const L = ["#--------------------------------------------------",
     'echo "Card Configuration"',
     "#--------------------------------------------------"];
-  // CPM (card A/B) and SFM (sfm N) modules.
-  cpms.forEach(c => {
-    if (isCpmSlot(c.slot)) {
-      L.push(`    card ${c.slot}`, `        card-type ${c.type}`, "        no shutdown", "    exit");
-    } else {
-      L.push(`    sfm ${c.slot}`, `        sfm-type ${c.type}`, "        no shutdown", "    exit");
-    }
-  });
-  // Line cards with their MDAs.
   cards.forEach(card => {
     L.push(`    card ${card.slot}`);
     if (pick(card.type)) L.push(`        card-type ${card.type}`);
@@ -1714,20 +1789,26 @@ function srosCardConfig(node) {
 }
 
 function srosSystem(node) {
-  return [
-    "#--------------------------------------------------",
+  const L = ["#--------------------------------------------------",
     'echo "System Configuration"',
     "#--------------------------------------------------",
     "    system",
-    `        name "${node.name}"`,
-    "        dns",
-    "            address-pref ipv4-first",
-    "        exit",
-    "        snmp",
-    "            packet-size 9216",
-    "        exit",
-    "    exit",
-  ].join("\n");
+    `        name "${node.name}"`];
+  // Power shelf + modules (required on SR-s chassis such as SR-1s/2s/7s/14s).
+  if (node.powerShelf) {
+    const shelf = pick(node.powerShelfType) || "ps-a4-shelf-dc";
+    const mod = pick(node.powerModuleType) || "ps-a-dc-6000";
+    const count = Math.max(1, parseInt(node.powerModules, 10) || 4);
+    L.push("        power-shelf 1", `            power-shelf-type ${shelf}`);
+    for (let i = 1; i <= count; i++) {
+      L.push(`            power-module ${i}`, `                power-module-type ${mod}`,
+        "                no shutdown", "            exit");
+    }
+    L.push("            no shutdown", "        exit");
+  }
+  L.push("        dns", "            address-pref ipv4-first", "        exit",
+    "        snmp", "            packet-size 9216", "        exit", "    exit");
+  return L.join("\n");
 }
 
 // Logical SR OS interface name (user-provided) with fallback to the port id.
@@ -2109,7 +2190,7 @@ function App() {
           <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 20, fontWeight: 700, color: G.accent, letterSpacing: 2 }}>
             ApexTopology
           </div>
-          <div style={{ fontSize: 10, color: G.textMuted, letterSpacing: 2, fontFamily: "'JetBrains Mono',monospace" }}>Nokia SR OS Configuration Generator v0.9.30</div>
+          <div style={{ fontSize: 10, color: G.textMuted, letterSpacing: 2, fontFamily: "'JetBrains Mono',monospace" }}>Nokia SR OS Configuration Generator v0.9.40</div>
         </div>
         <div style={{ marginLeft: "auto", display: "flex", gap: 10, alignItems: "center" }}>
           <Badge color={G.accent}>ContainerLAB</Badge>
@@ -2284,7 +2365,7 @@ function App() {
       {/* Footer */}
       <div style={{ background: G.panel, borderTop: `1px solid ${G.border}`, padding: "8px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <span style={{ fontSize: 11, color: G.textMuted, fontFamily: "'JetBrains Mono',monospace" }}>
-          ApexTopology v0.9.30 · Nokia SR OS 25.10.R3 · Configuration Generator
+          ApexTopology v0.9.40 · Nokia SR OS 25.10.R3 · Configuration Generator
         </span>
         <div style={{ display: "flex", gap: 8 }}>
           <div style={{ width: 6, height: 6, borderRadius: "50%", background: G.accent2, animation: "pulse 2s infinite" }} />
