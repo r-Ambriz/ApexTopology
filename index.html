@@ -10,6 +10,7 @@
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 <body>
     <div id="root"></div>
@@ -54,6 +55,9 @@ const NODE_TYPES = ["7750SR", "7250IXR", "7950XRS", "7210SAS", "7705SAR", "7450E
 const IGP_OPTIONS = ["OSPF", "ISIS", "None"];
 const BGP_ROLES = ["IBGP Route Reflector", "IBGP Peer", "EBGP Peer", "None"];
 const SERVICE_TYPES = ["VPRN", "L3VPN", "VPLS", "Epipe", "EVPN-VPWS", "EVPN-VXLAN", "IES", "None"];
+// SR OS faceplate-connector breakout options (configure port <c> connector breakout <type>).
+// Format c<#ports>-<speed>: e.g. c4-25g = 4x25G, c1-100g = single 100G, c4-100g = 400G QSFP-DD -> 4x100G.
+const BREAKOUT_OPTIONS = ["None", "c1-400g", "c1-100g", "c1-40g", "c1-10g", "c1-1g", "c2-100g", "c4-100g", "c4-25g", "c4-10g"];
 const LINK_TYPES = ["Link", "LAG", "None"];
 const HARDWARE_DB = {
   "source": {
@@ -1133,15 +1137,18 @@ function hardwareOptionsForNode(node) {
   return hardwareOptionsForPlatform(node.type);
 }
 
+// Hardware default: one line card in slot 1 with one MDA in slot 1, no CPM/SFM.
+const defaultCards = () => [{ slot: "1", type: "None", mdas: [{ slot: "1", type: "None" }] }];
+
 const defaultNode = (id) => ({
   id,
   name: `NODE${id}`,
   type: "7750SR",
   chassisModel: "None",
   systemIp: `10.0.0.${id}/32`,
-  sfmCpmType: "None",
-  iomType: "None",
-  mdaType: "None",
+  includeSystem: true,
+  cpms: [],
+  cards: defaultCards(),
   asn: "65000",
   igp: "OSPF",
   ospfArea: "0.0.0.0",
@@ -1158,7 +1165,7 @@ const defaultNode = (id) => ({
   service: "None",
   customerId: "",
   rdRt: "",
-  interfaces: [{ name: "1/1/c1/1", ip: `192.168.${id}.1/30`, role: "network", peer: "" }],
+  interfaces: [{ name: "1/1/c1/1", ip: `192.168.${id}.1/30`, role: "network", breakout: "None", ifaceName: "" }],
 });
 
 const defaultLink = (id) => ({
@@ -1312,34 +1319,33 @@ function NodeEditor({ node, onChange, onDelete, index }) {
   const upd = (k, v) => onChange({ ...node, [k]: v });
   const chassisOptions = chassisOptionsForPlatform(node.type);
   const hardwareOptions = hardwareOptionsForNode(node);
-  const setPlatform = (type) => {
-    const nextHardwareOptions = hardwareOptionsForPlatform(type);
-    onChange({
-      ...node,
-      type,
-      chassisModel: "None",
-      sfmCpmType: nextHardwareOptions.sfmCpmTypes.includes(node.sfmCpmType) ? node.sfmCpmType : "None",
-      iomType: nextHardwareOptions.iomCardTypes.includes(node.iomType) ? node.iomType : "None",
-      mdaType: nextHardwareOptions.mdaTypes.includes(node.mdaType) ? node.mdaType : "None",
-    });
-  };
-  const setChassisModel = (chassisModel) => {
-    const nextHardwareOptions = chassisModel !== "None" ? HARDWARE_DB.chassis[chassisModel] : hardwareOptionsForPlatform(node.type);
-    onChange({
-      ...node,
-      chassisModel,
-      sfmCpmType: nextHardwareOptions.sfmCpmTypes.includes(node.sfmCpmType) ? node.sfmCpmType : "None",
-      iomType: nextHardwareOptions.iomCardTypes.includes(node.iomType) ? node.iomType : "None",
-      mdaType: nextHardwareOptions.mdaTypes.includes(node.mdaType) ? node.mdaType : "None",
-    });
-  };
+  // Changing platform/chassis invalidates prior card selections -> reset to a clean default.
+  const setPlatform = (type) => onChange({ ...node, type, chassisModel: "None", cpms: [], cards: defaultCards() });
+  const setChassisModel = (chassisModel) => onChange({ ...node, chassisModel, cpms: [], cards: defaultCards() });
+
   const updIface = (i, k, v) => {
     const ifaces = [...node.interfaces];
     ifaces[i] = { ...ifaces[i], [k]: v };
     upd("interfaces", ifaces);
   };
-  const addIface = () => upd("interfaces", [...node.interfaces, { name: "", ip: "", role: "network", peer: "" }]);
+  const addIface = () => upd("interfaces", [...node.interfaces, { name: "", ip: "", role: "network", breakout: "None", ifaceName: "" }]);
   const delIface = (i) => upd("interfaces", node.interfaces.filter((_, j) => j !== i));
+
+  // ── CPM/SFM module handlers ──
+  const cpms = node.cpms || [];
+  const cpmSlots = ["A", "B", "C", "D"];
+  const addCpm = () => upd("cpms", [...cpms, { slot: cpmSlots[cpms.length] || String(cpms.length + 1), type: "None" }]);
+  const updCpm = (i, k, v) => upd("cpms", cpms.map((c, j) => j === i ? { ...c, [k]: v } : c));
+  const delCpm = (i) => upd("cpms", cpms.filter((_, j) => j !== i));
+
+  // ── Line-card + MDA handlers ──
+  const cards = node.cards || [];
+  const addCard = () => upd("cards", [...cards, { slot: String(cards.length + 1), type: "None", mdas: [{ slot: "1", type: "None" }] }]);
+  const updCard = (i, k, v) => upd("cards", cards.map((c, j) => j === i ? { ...c, [k]: v } : c));
+  const delCard = (i) => upd("cards", cards.filter((_, j) => j !== i));
+  const addMda = (ci) => upd("cards", cards.map((c, j) => j === ci ? { ...c, mdas: [...(c.mdas || []), { slot: String((c.mdas || []).length + 1), type: "None" }] } : c));
+  const updMda = (ci, mi, k, v) => upd("cards", cards.map((c, j) => j === ci ? { ...c, mdas: c.mdas.map((m, mj) => mj === mi ? { ...m, [k]: v } : m) } : c));
+  const delMda = (ci, mi) => upd("cards", cards.map((c, j) => j === ci ? { ...c, mdas: c.mdas.filter((_, mj) => mj !== mi) } : c));
 
   return (
     <div style={{ border: `1px solid ${open ? G.accent : G.border}`, borderRadius: 0, marginBottom: 8, overflow: "hidden", transition: "all .2s" }}>
@@ -1363,15 +1369,54 @@ function NodeEditor({ node, onChange, onDelete, index }) {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
             <div><Label>Node Name</Label><Input value={node.name} onChange={v => upd("name", v)} placeholder="BNG1" /></div>
             <div><Label>Platform Type</Label><Select value={node.type} onChange={setPlatform} options={NODE_TYPES} /></div>
-            <div><Label>System IP / Loopback</Label><Input value={node.systemIp} onChange={v => upd("systemIp", v)} placeholder="10.0.0.1/32" mono /></div>
+            <div>
+              <Label>System IP / Loopback</Label>
+              <Input value={node.systemIp} onChange={v => upd("systemIp", v)} placeholder="10.0.0.1/32" mono />
+              <div style={{ marginTop: 6 }}>
+                <Toggle value={node.includeSystem !== false} onChange={v => upd("includeSystem", v)} label="Include system interface" />
+              </div>
+            </div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
             <div><Label>Chassis Model</Label><Select value={chassisOptions.includes(node.chassisModel) ? node.chassisModel : "None"} onChange={setChassisModel} options={chassisOptions} /></div>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-            <div><Label>SFM/CPM Type</Label><Select value={hardwareOptions.sfmCpmTypes.includes(node.sfmCpmType) ? node.sfmCpmType : "None"} onChange={v => upd("sfmCpmType", v)} options={hardwareOptions.sfmCpmTypes} /></div>
-            <div><Label>IOM/Card Type</Label><Select value={hardwareOptions.iomCardTypes.includes(node.iomType) ? node.iomType : "None"} onChange={v => upd("iomType", v)} options={hardwareOptions.iomCardTypes} /></div>
-            <div><Label>MDA Type</Label><Select value={hardwareOptions.mdaTypes.includes(node.mdaType) ? node.mdaType : "None"} onChange={v => upd("mdaType", v)} options={hardwareOptions.mdaTypes} /></div>
+          {/* Hardware — CPM/SFM modules + line cards with MDAs */}
+          <div style={{ border: `1px solid ${G.border}`, padding: 10, display: "grid", gap: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <Label>CPM / SFM Modules</Label>
+              <Btn onClick={addCpm} variant="ghost" style={{ padding: "3px 10px", fontSize: 11 }}>+ CPM/SFM</Btn>
+            </div>
+            {cpms.length === 0 && <div style={{ fontSize: 11, color: G.textMuted }}>None — integrated chassis or containerlab default.</div>}
+            {cpms.map((c, i) => (
+              <div key={i} style={{ display: "grid", gridTemplateColumns: "0.6fr 3fr auto", gap: 8 }}>
+                <Input value={c.slot} onChange={v => updCpm(i, "slot", v)} placeholder="A" mono />
+                <Select value={hardwareOptions.sfmCpmTypes.includes(c.type) ? c.type : "None"} onChange={v => updCpm(i, "type", v)} options={hardwareOptions.sfmCpmTypes} />
+                <Btn onClick={() => delCpm(i)} variant="danger" style={{ padding: "3px 10px", fontSize: 11 }}>✕</Btn>
+              </div>
+            ))}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
+              <Label>Line Cards (IOM) + MDAs</Label>
+              <Btn onClick={addCard} variant="ghost" style={{ padding: "3px 10px", fontSize: 11 }}>+ CARD</Btn>
+            </div>
+            {cards.map((card, ci) => (
+              <div key={ci} style={{ border: `1px solid ${G.border}`, padding: 8, display: "grid", gap: 6 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "0.6fr 3fr auto", gap: 8, alignItems: "center" }}>
+                  <Input value={card.slot} onChange={v => updCard(ci, "slot", v)} placeholder="1" mono />
+                  <Select value={hardwareOptions.iomCardTypes.includes(card.type) ? card.type : "None"} onChange={v => updCard(ci, "type", v)} options={hardwareOptions.iomCardTypes} />
+                  <Btn onClick={() => delCard(ci)} variant="danger" style={{ padding: "3px 10px", fontSize: 11 }}>✕ CARD</Btn>
+                </div>
+                {(card.mdas || []).map((m, mi) => (
+                  <div key={mi} style={{ display: "grid", gridTemplateColumns: "0.6fr 3fr auto", gap: 8, paddingLeft: 18 }}>
+                    <Input value={m.slot} onChange={v => updMda(ci, mi, "slot", v)} placeholder="1" mono />
+                    <Select value={hardwareOptions.mdaTypes.includes(m.type) ? m.type : "None"} onChange={v => updMda(ci, mi, "type", v)} options={hardwareOptions.mdaTypes} />
+                    <Btn onClick={() => delMda(ci, mi)} variant="danger" style={{ padding: "3px 8px", fontSize: 11 }}>✕</Btn>
+                  </div>
+                ))}
+                <div style={{ paddingLeft: 18 }}>
+                  <Btn onClick={() => addMda(ci)} variant="ghost" style={{ padding: "2px 10px", fontSize: 11 }}>+ MDA</Btn>
+                </div>
+              </div>
+            ))}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
             <div><Label>IGP Protocol</Label><Select value={node.igp} onChange={v => upd("igp", v)} options={IGP_OPTIONS} /></div>
@@ -1402,12 +1447,20 @@ function NodeEditor({ node, onChange, onDelete, index }) {
               <Label>Network Interfaces</Label>
               <Btn onClick={addIface} variant="success" style={{ padding: "3px 10px", fontSize: 11 }}>+ ADD</Btn>
             </div>
+            {node.interfaces.length > 0 && (
+              <div style={{ display: "grid", gridTemplateColumns: "2fr 2fr 1.3fr 1.6fr 1.6fr auto", gap: 8, marginBottom: 4 }}>
+                {["Port ID", "IP / Prefix", "Role", "Breakout", "Interface Name", ""].map((h, k) => (
+                  <span key={k} style={{ fontSize: 10, color: G.textMuted, fontFamily: "'JetBrains Mono',monospace", letterSpacing: 0.5 }}>{h}</span>
+                ))}
+              </div>
+            )}
             {node.interfaces.map((iface, i) => (
-              <div key={i} style={{ display: "grid", gridTemplateColumns: "2fr 2fr 1.5fr 2fr auto", gap: 8, marginBottom: 6, animation: "slideIn .2s ease" }}>
+              <div key={i} style={{ display: "grid", gridTemplateColumns: "2fr 2fr 1.3fr 1.6fr 1.6fr auto", gap: 8, marginBottom: 6, animation: "slideIn .2s ease" }}>
                 <Input value={iface.name} onChange={v => updIface(i, "name", v)} placeholder="1/1/c1/1" mono />
                 <Input value={iface.ip} onChange={v => updIface(i, "ip", v)} placeholder="192.168.1.1/30" mono />
                 <Select value={iface.role} onChange={v => updIface(i, "role", v)} options={["network", "hybrid", "access"]} />
-                <Input value={iface.peer} onChange={v => updIface(i, "peer", v)} placeholder="Peer: BNG2" />
+                <Select value={iface.breakout || "None"} onChange={v => updIface(i, "breakout", v)} options={BREAKOUT_OPTIONS} />
+                <Input value={iface.ifaceName} onChange={v => updIface(i, "ifaceName", v)} placeholder="to-CORE1" mono />
                 <Btn onClick={() => delIface(i)} variant="danger" style={{ padding: "3px 10px", fontSize: 11 }}>✕</Btn>
               </div>
             ))}
@@ -1439,320 +1492,384 @@ function LinkEditor({ link, onChange, onDelete, nodes }) {
   );
 }
 
-// ─── Build prompt ─────────────────────────────────────────────────────────────
-function buildPrompt(nodes, links, global) {
-  const topology = {
-    labName: global.labName,
-    srosVersion: global.srosVersion,
-    ipPool: global.ipPool,
-    nodes: nodes.map(n => ({
-      name: n.name,
-      platform: n.type,
-      chassisModel: n.chassisModel,
-      systemIp: n.systemIp,
-      sfmCpmType: n.sfmCpmType,
-      iomType: n.iomType,
-      mdaType: n.mdaType,
-      asn: n.asn,
-      igp: n.igp,
-      ospfArea: n.ospfArea,
-      isisArea: n.isisArea,
-      isisLevel: n.isisLevel,
-      bgpRole: n.bgpRole,
-      neighborIp: n.neighborIp,
-      clusterId: n.clusterId,
-      ldp: n.ldpEnabled,
-      rsvp: n.rsvpEnabled,
-      lspId: n.lspId,
-      pathName: n.pathName,
-      farEndIp: n.farEndIp,
-      service: n.service,
-      customerId: n.customerId,
-      rdRt: n.rdRt,
-      interfaces: n.interfaces,
-    })),
-    links: links.filter(l => l.nodeA && l.nodeB),
-  };
+// ─── Deterministic config engine ──────────────────────────────────────────────
+// Builds SR OS 25.10.R3 classic-CLI .sros.cfg files and a Containerlab
+// nokia_srsim .clab.yml. Output is chassis-dependent:
+//   * clab: integrated chassis -> single node w/ env overrides; distributed
+//     chassis -> grouped `components:` list (CPM slots + line-card slot).
+//   * SR OS: a "Card Configuration" block provisions sfm/card/mda from the
+//     selected hardware types (required because a full startup-config must
+//     provision its own cards).
 
-  return `You are an expert Nokia SR OS 25.10.R3 network engineer and ContainerLAB architect.
+// Chassis that ship redundant CPMs -> emit slot B in the clab components list.
+const DUAL_CPM_CHASSIS = new Set([
+  "SR-7", "SR-7s", "SR-12", "SR-12e", "SR-14s",
+  "SR-2s", "SR-2se", "XRS-20XRS-20e", "ESS-7", "ESS-12",
+  "IXR-6", "IXR-10",
+]);
 
-Generate COMPLETE Nokia SR OS configuration files for ContainerLAB topology. For EACH node, produce a separate config block.
+function ipNoMask(ip) { return String(ip || "").split("/")[0].trim(); }
 
-Topology JSON:
-${JSON.stringify(topology, null, 2)}
+// Router-id -> IS-IS system-id, e.g. 10.0.0.1 -> 0100.0000.0001
+function systemIdFromIp(ip) {
+  const octs = (ipNoMask(ip) || "0.0.0.0").split(".")
+    .map(o => String(parseInt(o || "0", 10) || 0).padStart(3, "0"));
+  while (octs.length < 4) octs.push("000");
+  const d = octs.slice(0, 4).join("");
+  return `${d.slice(0, 4)}.${d.slice(4, 8)}.${d.slice(8, 12)}`;
+}
 
-CRITICAL FORMAT REQUIREMENTS (SR OS 25.10.R3):
+function chassisModelOf(node) {
+  return (node.chassisModel && node.chassisModel !== "None") ? node.chassisModel : null;
+}
 
-1. EXACT File Header Structure:
-# TiMOS-B-25.10.R3 both/x86_64 Nokia 7750 SR Copyright (c) 2000-2026 Nokia.
-# All rights reserved. All use subject to applicable license agreements.
-# Built on Wed Feb 11 21:15:49 UTC 2026 by builder in /builds/2510B/R3/panos
-# Configuration format version 25.10 revision 0
+// clab `type:` value (lowercased chassis or platform), e.g. SR-1 -> sr-1
+function clabTypeOf(node) {
+  const base = chassisModelOf(node) || node.type;
+  return String(base).toLowerCase().replace(/_/g, "-");
+}
 
-# Generated <current-date>
+function pick(v) { return (v && v !== "None") ? v : null; }
 
-exit all
-configure
+// Configured CPM/SFM modules (type selected) and line cards (own type or any MDA type).
+function nodeCpms(node) { return (node.cpms || []).filter(c => pick(c.type)); }
+function nodeCards(node) {
+  return (node.cards || []).filter(c => pick(c.type) || (c.mdas || []).some(m => pick(m.type)));
+}
+// A CPM occupies an alpha slot (A/B); an SFM occupies a numeric slot.
+function isCpmSlot(slot) { return /^[A-Za-z]/.test(String(slot || "")); }
 
-2. System Configuration Section:
-#--------------------------------------------------
-echo "System Configuration"
-#--------------------------------------------------
-    system
-        name "<node-name>"
-        dns
-            address-pref ipv4-first
-        exit
-        snmp
-            packet-size 9216
-        exit
-    exit
+// Faceplate connector for a port name, e.g. 1/1/c1/1 -> 1/1/c1, 1/x2/3/c4/5 -> 1/x2/3/c4.
+function connectorOf(name) {
+  const parts = String(name || "").split("/");
+  const idx = parts.findIndex(p => /^c\d+$/.test(p));
+  return idx === -1 ? null : parts.slice(0, idx + 1).join("/");
+}
 
-3. Router Base Configuration:
-#--------------------------------------------------
-echo "Router (Network Side) Configuration"
-#--------------------------------------------------
-    router Base
-        router-id <system-ip-without-mask>
-        autonomous-system <asn>
-        interface "system"
-            address <system-ip>
-            loopback
-            no shutdown
-        exit
-        interface "<interface-name>"
-            address <ip/prefix>
-            port <port-id>
-            no shutdown
-        exit
-    exit
+// A node is "distributed" (chassis-based, needs CPM/line-card slots) when its
+// chassis takes a separate IOM/line-card in the hardware DB, or the user added a
+// CPM/SFM module or a line card with a card-type. Otherwise it is an integrated
+// pizza-box.
+function isDistributedNode(node) {
+  const model = chassisModelOf(node);
+  const hw = model ? HARDWARE_DB.chassis[model] : null;
+  const dbHasIom = hw && (hw.iomCardTypes || []).some(v => v && v !== "None");
+  const userCard = (node.cards || []).some(c => pick(c.type));
+  const userCpm = (node.cpms || []).some(c => pick(c.type));
+  return Boolean(dbHasIom || userCard || userCpm);
+}
 
-4. OSPF Configuration (if enabled):
-    router Base
-        ospf 0
-            router-id <router-id>
-            area <area-id>
-                interface "system"
-                    no shutdown
-                exit
-                interface "<interface-name>"
-                    interface-type point-to-point
-                    no shutdown
-                exit
-            exit
-            no shutdown
-        exit
-    exit
+// ── SR OS classic-CLI section builders ────────────────────────────────────────
+function srosCardConfig(node) {
+  const cpms = nodeCpms(node);
+  const cards = nodeCards(node);
+  if (!cpms.length && !cards.length) return null; // rely on containerlab defaults
+  const L = ["#--------------------------------------------------",
+    'echo "Card Configuration"',
+    "#--------------------------------------------------"];
+  // CPM (card A/B) and SFM (sfm N) modules.
+  cpms.forEach(c => {
+    if (isCpmSlot(c.slot)) {
+      L.push(`    card ${c.slot}`, `        card-type ${c.type}`, "        no shutdown", "    exit");
+    } else {
+      L.push(`    sfm ${c.slot}`, `        sfm-type ${c.type}`, "        no shutdown", "    exit");
+    }
+  });
+  // Line cards with their MDAs.
+  cards.forEach(card => {
+    L.push(`    card ${card.slot}`);
+    if (pick(card.type)) L.push(`        card-type ${card.type}`);
+    (card.mdas || []).filter(m => pick(m.type)).forEach(m => {
+      L.push(`        mda ${m.slot}`, `            mda-type ${m.type}`, "            no shutdown", "        exit");
+    });
+    L.push("        no shutdown", "    exit");
+  });
+  return L.join("\n");
+}
 
-5. ISIS Configuration (if enabled):
-    router Base
-        isis 0
-            level-capability level-<1|2|1-2>
-            system-id <system-id-hex>
-            area-address [<area-id>]
-            reference-bandwidth <bandwidth>
-            interface "system"
-                no shutdown
-            exit
-            interface "<interface-name>"
-                interface-type point-to-point
-                no shutdown
-            exit
-            no shutdown
-        exit
-    exit
+function srosSystem(node) {
+  return [
+    "#--------------------------------------------------",
+    'echo "System Configuration"',
+    "#--------------------------------------------------",
+    "    system",
+    `        name "${node.name}"`,
+    "        dns",
+    "            address-pref ipv4-first",
+    "        exit",
+    "        snmp",
+    "            packet-size 9216",
+    "        exit",
+    "    exit",
+  ].join("\n");
+}
 
-6. MPLS and LDP Configuration (if enabled):
-    router Base
-        mpls
-            interface "system"
-                no shutdown
-            exit
-            interface "<interface-name>"
-                no shutdown
-            exit
-            no shutdown
-        exit
-        ldp
-            interface-parameters
-                interface "system"
-                    ipv4
-                        no shutdown
-                    exit
-                exit
-                interface "<interface-name>"
-                    ipv4
-                        no shutdown
-                    exit
-                exit
-            exit
-            no shutdown
-        exit
-    exit
+// Logical SR OS interface name (user-provided) with fallback to the port id.
+function ifName(i) { return pick(i.ifaceName) || i.name; }
 
-7. RSVP-TE Configuration (if enabled):
-    router Base
-        rsvp
-            interface "system"
-                no shutdown
-            exit
-            interface "<interface-name>"
-                no shutdown
-            exit
-            no shutdown
-        exit
-        mpls
-            path "<path-name>"
-                no shutdown
-            exit
-            lsp "<lsp-name>"
-                to <destination-ip>
-                primary "<path-name>"
-                no shutdown
-            exit
-        exit
-    exit
+// The whole router-base section is emitted under ONE `router Base` context:
+// router-id/AS + interfaces, then IGP, MPLS/LDP/RSVP, and BGP as inner blocks.
+function srosRouterBaseInner(node) {
+  const L = [`        router-id ${ipNoMask(node.systemIp)}`];
+  if (pick(node.asn)) L.push(`        autonomous-system ${node.asn}`);
+  if (node.includeSystem !== false) {
+    L.push('        interface "system"', `            address ${node.systemIp}`,
+      "            loopback", "            no shutdown", "        exit");
+  }
+  (node.interfaces || []).filter(i => i.name).forEach(i => {
+    L.push(`        interface "${ifName(i)}"`);
+    if (i.ip) L.push(`            address ${i.ip}`);
+    L.push(`            port ${i.name}`, "            no shutdown", "        exit");
+  });
+  return L.join("\n");
+}
 
-8. BGP Configuration:
-    router Base
-        bgp
-            rapid-withdrawal
-            group "<group-name>"
-                family ipv4 vpn-ipv4 ipv6 vpn-ipv6 evpn
-                type internal
-                peer-as <asn>
-                cluster <cluster-id>  # Only for Route Reflector
-                neighbor <neighbor-ip>
-                    no shutdown
-                exit
-            exit
-            no shutdown
-        exit
-    exit
+function srosIgpInner(node) {
+  const ifaces = (node.interfaces || []).filter(i => i.name);
+  const sys = node.includeSystem !== false;
+  if (node.igp === "OSPF") {
+    const L = ["        ospf 0", `            router-id ${ipNoMask(node.systemIp)}`,
+      `            area ${node.ospfArea || "0.0.0.0"}`];
+    if (sys) L.push('                interface "system"', "                    no shutdown", "                exit");
+    ifaces.forEach(i => L.push(`                interface "${ifName(i)}"`,
+      "                    interface-type point-to-point", "                    no shutdown", "                exit"));
+    L.push("            exit", "            no shutdown", "        exit");
+    return L.join("\n");
+  }
+  if (node.igp === "ISIS") {
+    const L = ["        isis 0", `            level-capability level-${node.isisLevel || "2"}`,
+      `            system-id ${systemIdFromIp(node.systemIp)}`, `            area-address ${node.isisArea || "49.0001"}`];
+    if (sys) L.push('            interface "system"', "                passive", "                no shutdown", "            exit");
+    ifaces.forEach(i => L.push(`            interface "${ifName(i)}"`,
+      "                interface-type point-to-point", "                no shutdown", "            exit"));
+    L.push("            no shutdown", "        exit");
+    return L.join("\n");
+  }
+  return null;
+}
 
-9. Service Configuration (L3VPN example):
-#--------------------------------------------------
-echo "Service Configuration"
-#--------------------------------------------------
-    service
-        customer 1 name "1" create
-            description "Default customer"
-        exit
-        vprn <service-id> name "<vrf-name>" customer 1 create
-            description "<description>"
-            route-distinguisher <rd>
-            auto-bind-tunnel
-                resolution any
-            exit
-            vrf-target target:<rt>
-            autonomous-system <asn>
-            interface "<interface-name>" create
-                address <ip/prefix>
-                sap <port-id>:<vlan> create
-                exit
-                no shutdown
-            exit
-            bgp
-                group "<group-name>"
-                    neighbor <neighbor-ip>
-                        no shutdown
-                    exit
-                exit
-            exit
-            no shutdown
-        exit
-    exit
+function srosMplsLdpInner(node) {
+  if (!node.ldpEnabled && !node.rsvpEnabled) return null;
+  const ifaces = (node.interfaces || []).filter(i => i.name);
+  const sys = node.includeSystem !== false;
+  const L = ["        mpls"];
+  if (sys) L.push('            interface "system"', "                no shutdown", "            exit");
+  ifaces.forEach(i => L.push(`            interface "${ifName(i)}"`, "                no shutdown", "            exit"));
+  if (node.rsvpEnabled) {
+    if (pick(node.pathName)) L.push(`            path "${node.pathName}"`, "                no shutdown", "            exit");
+    if (pick(node.lspId)) {
+      L.push(`            lsp "${node.lspId}"`);
+      if (pick(node.farEndIp)) L.push(`                to ${node.farEndIp}`);
+      if (pick(node.pathName)) L.push(`                primary "${node.pathName}"`, "                exit");
+      L.push("                no shutdown", "            exit");
+    }
+  }
+  L.push("            no shutdown", "        exit");
+  if (node.rsvpEnabled) {
+    L.push("        rsvp");
+    if (sys) L.push('            interface "system"', "                no shutdown", "            exit");
+    ifaces.forEach(i => L.push(`            interface "${ifName(i)}"`, "                no shutdown", "            exit"));
+    L.push("            no shutdown", "        exit");
+  }
+  if (node.ldpEnabled) {
+    L.push("        ldp", "            interface-parameters");
+    if (sys) L.push('                interface "system"', "                    ipv4",
+      "                        no shutdown", "                    exit", "                exit");
+    ifaces.forEach(i => L.push(`                interface "${ifName(i)}"`, "                    ipv4",
+      "                        no shutdown", "                    exit", "                exit"));
+    L.push("            exit", "            no shutdown", "        exit");
+  }
+  return L.join("\n");
+}
 
-10. Port Configuration:
-#--------------------------------------------------
-echo "Port Configuration"
-#--------------------------------------------------
-    port <port-id>
-        description "<description>"
-        ethernet
-            mode access
-            encap-type dot1q
-        exit
-        no shutdown
-    exit
+function srosBgpInner(node) {
+  if (!pick(node.bgpRole) || node.bgpRole === "None") return null;
+  const isRR = node.bgpRole === "IBGP Route Reflector";
+  const isEbgp = node.bgpRole === "EBGP Peer";
+  const group = isEbgp ? "ebgp" : "ibgp";
+  const L = ["        bgp", "            rapid-withdrawal", `            group "${group}"`,
+    "                family ipv4 vpn-ipv4 ipv6 vpn-ipv6 evpn",
+    `                type ${isEbgp ? "external" : "internal"}`,
+    `                peer-as ${node.asn || "65000"}`];
+  if (isRR && pick(node.clusterId)) L.push(`                cluster ${node.clusterId}`);
+  if (pick(node.neighborIp)) L.push(`                neighbor ${node.neighborIp}`, "                    no shutdown", "                exit");
+  L.push("            exit", "            no shutdown", "        exit");
+  return L.join("\n");
+}
 
-11. File Footer:
-exit all
+// Single router Base section wrapping router-id/AS, interfaces, IGP, MPLS and BGP.
+function srosRouterSection(node) {
+  const inner = [srosRouterBaseInner(node), srosIgpInner(node), srosMplsLdpInner(node), srosBgpInner(node)]
+    .filter(Boolean).join("\n");
+  return ["#--------------------------------------------------",
+    'echo "Router (Network Side) Configuration"',
+    "#--------------------------------------------------",
+    "    router Base", inner, "    exit"].join("\n");
+}
 
-# Finished <current-date>
+// Connector breakouts get their own section and are enabled with `no shutdown`.
+function srosConnectors(node) {
+  const ifaces = (node.interfaces || []).filter(i => i.name);
+  const done = {};
+  const L = [];
+  ifaces.forEach(i => {
+    const bo = pick(i.breakout);
+    const conn = connectorOf(i.name);
+    if (!bo || !conn || done[conn]) return;
+    done[conn] = true;
+    L.push(`    port ${conn}`, "        connector", `            breakout ${bo}`, "        exit",
+      "        no shutdown", "    exit");
+  });
+  if (!L.length) return null;
+  return ["#--------------------------------------------------", 'echo "Connector Configuration"',
+    "#--------------------------------------------------", ...L].join("\n");
+}
 
-OUTPUT FORMAT FOR EACH NODE:
-=== FILE: <nodeName>.sros.cfg ===
-<complete config following EXACT format above with all echo statements, proper indentation (4 spaces), and all sections>
-=== END ===
+function srosService(node) {
+  const svc = pick(node.service);
+  if (!svc) return null;
+  const rd = pick(node.rdRt) || `${ipNoMask(node.systemIp)}:1`;
+  const cust = pick(node.customerId) || "1";
+  const L = ["#--------------------------------------------------", 'echo "Service Configuration"',
+    "#--------------------------------------------------", "    service",
+    `        customer ${cust} name "${cust}" create`,
+    '            description "Default customer"', "        exit"];
+  if (svc === "VPRN" || svc === "L3VPN" || svc === "IES") {
+    if (svc === "IES") {
+      L.push(`        ies 1 name "${node.name}-ies" customer ${cust} create`, "            no shutdown", "        exit");
+    } else {
+      L.push(`        vprn 1 name "${node.name}-vprn" customer ${cust} create`,
+        `            route-distinguisher ${rd}`, "            auto-bind-tunnel",
+        "                resolution any", "            exit",
+        `            vrf-target target:${rd}`,
+        `            autonomous-system ${node.asn || "65000"}`, "            no shutdown", "        exit");
+    }
+  } else if (svc === "VPLS" || svc === "EVPN-VXLAN") {
+    L.push(`        vpls 1 name "${node.name}-vpls" customer ${cust} create`);
+    if (svc === "EVPN-VXLAN") {
+      L.push("            vxlan instance 1 vni 1 create", "            exit",
+        "            bgp", "            exit", "            bgp-evpn",
+        "                evi 1", "                vxlan bgp 1 vxlan-instance 1", "                    no shutdown",
+        "                exit", "            exit");
+    }
+    L.push("            no shutdown", "        exit");
+  } else if (svc === "Epipe" || svc === "EVPN-VPWS") {
+    L.push(`        epipe 1 name "${node.name}-epipe" customer ${cust} create`);
+    if (svc === "EVPN-VPWS") {
+      L.push("            bgp", "            exit", "            bgp-evpn",
+        "                local-attachment-circuit \"ac1\" create", "                exit",
+        "                remote-attachment-circuit \"ac2\" create", "                exit", "            exit");
+    }
+    L.push("            no shutdown", "        exit");
+  }
+  L.push("    exit");
+  return L.join("\n");
+}
 
-ALSO GENERATE ContainerLab YAML:
-=== FILE: clab-snippet.yml ===
-name: ${topology.labName}
+function srosPorts(node) {
+  const ifaces = (node.interfaces || []).filter(i => i.name);
+  if (!ifaces.length) return null;
+  const L = ["#--------------------------------------------------", 'echo "Port Configuration"',
+    "#--------------------------------------------------"];
+  ifaces.forEach(i => {
+    L.push(`    port ${i.name}`);
+    if (i.role === "access" || i.role === "hybrid") {
+      L.push("        ethernet", `            mode ${i.role}`, "            encap-type dot1q", "        exit");
+    }
+    L.push("        no shutdown", "    exit");
+  });
+  return L.join("\n");
+}
 
-topology:
-  kinds:
-    nokia_srsim:
-      image: nokia_srsim:${topology.srosVersion}
-      license: /opt/nokia/sros/license.txt
+function buildSrosConfig(node, global) {
+  const ver = (global.srosVersion || "25.10.R3");
+  const now = new Date().toISOString().slice(0, 19).replace("T", " ") + " UTC";
+  // ver "25.10.R3" -> major "2510", release "R3" -> build path "2510B/R3"
+  const [maj, rel] = [ver.replace(/\./g, "").replace(/R.*/, ""), (ver.match(/R\d+/) || ["R1"])[0]];
+  const parts = [];
+  parts.push([
+    `# TiMOS-B-${ver} both/x86_64 Nokia 7750 SR Copyright (c) 2000-2026 Nokia.`,
+    "# All rights reserved. All use subject to applicable license agreements.",
+    `# Built on Wed Feb 11 21:15:49 UTC 2026 by builder in /builds/${maj}B/${rel}/panos`,
+    `# Configuration format version ${ver.slice(0, 5)} revision 0`,
+    "",
+    `# Generated ${now}`,
+    "",
+    "exit all",
+    "configure",
+  ].join("\n"));
+  [srosSystem(node), srosCardConfig(node), srosConnectors(node), srosPorts(node),
+   srosRouterSection(node), srosService(node)]
+    .filter(Boolean).forEach(s => parts.push(s));
+  parts.push(["exit all", "", `# Finished ${now}`].join("\n"));
+  return parts.join("\n");
+}
 
-  nodes:
-    # Generate one node entry per topology node using Containerlab's Nokia SR-SIM kind.
-    # Example integrated/non-distributed node:
-    # <node-name>:
-    #   kind: nokia_srsim
-    #   type: <lowercase chassisModel, for example sr-1 or ixr-r6>
-    #   startup-config: <node-name>.sros.cfg
-    #   components:
-    #     - mda:
-    #       - slot: 1
-    #         type: <selected MDA type>   # omit when MDA is None
-    #
-    # Example distributed grouped node:
-    # <node-name>:
-    #   kind: nokia_srsim
-    #   type: <lowercase chassisModel, for example sr-7 or sr-14s>
-    #   startup-config: <node-name>.sros.cfg
-    #   components:
-    #     - slot: A
-    #       sfm: <selected SFM type>      # include when selected and applicable
-    #     - slot: B
-    #       sfm: <selected SFM type>      # include for dual-CPM chassis
-    #     - slot: 1
-    #       type: <selected IOM/Card type>
-    #       sfm: <selected SFM type>
-    #       mda:
-    #         - slot: 1
-    #           type: <selected MDA type>
-    #
-${nodes.map(n => `    ${n.name}:
-      kind: nokia_srsim
-      type: ${(n.chassisModel && n.chassisModel !== "None" ? n.chassisModel : n.type).toLowerCase().replace(/_/g, "-")}
-      startup-config: ${n.name}.sros.cfg`).join('\n')}
+// ── Containerlab .clab.yml ────────────────────────────────────────────────────
+function buildClabNodeBlock(node) {
+  const type = clabTypeOf(node);
+  const cpms = nodeCpms(node);
+  const cards = nodeCards(node);
+  // SFM type (numeric-slot or *sfm* module) is passed to line cards via env.
+  const sfmType = (cpms.find(c => /sfm/i.test(c.type)) ||
+                   cpms.find(c => !isCpmSlot(c.slot)) || {}).type || null;
+  const L = [`    ${node.name}:`, "      kind: nokia_srsim", `      type: ${type}`,
+    `      startup-config: ${node.name}.sros.cfg`];
+  if (isDistributedNode(node)) {
+    L.push("      components:");
+    // CPM components (alpha slots). Fall back to A(/B) when none specified.
+    const cpmSlots = cpms.filter(c => isCpmSlot(c.slot)).map(c => c.slot);
+    if (cpmSlots.length) {
+      cpmSlots.forEach(s => L.push(`        - slot: ${s}`));
+    } else {
+      L.push("        - slot: A");
+      if (DUAL_CPM_CHASSIS.has(chassisModelOf(node))) L.push("        - slot: B");
+    }
+    // Line-card components. Fall back to a single slot 1 when none specified.
+    const lineCards = cards.length ? cards : [{ slot: "1", type: "None", mdas: [] }];
+    lineCards.forEach(card => {
+      L.push(`        - slot: ${card.slot}`);
+      if (pick(card.type)) L.push(`          type: ${card.type}`);
+      const mdas = (card.mdas || []).filter(m => pick(m.type));
+      // Per containerlab docs: when overriding card/mda, SFM + MDA env must be set.
+      if (sfmType || mdas.length) {
+        L.push("          env:");
+        if (sfmType) L.push(`            NOKIA_SROS_SFM: ${sfmType}`);
+        mdas.forEach(m => L.push(`            NOKIA_SROS_MDA_${m.slot}: ${m.type}`));
+      }
+    });
+  } else {
+    // Integrated pizza-box: override each MDA via env var.
+    const mdas = cards.flatMap(c => c.mdas || []).filter(m => pick(m.type));
+    if (mdas.length) {
+      L.push("      env:");
+      mdas.forEach(m => L.push(`        NOKIA_SROS_MDA_${m.slot}: ${m.type}`));
+    }
+  }
+  return L.join("\n");
+}
 
-  links:
-${links.filter(l => l.nodeA && l.nodeB).map(l => `    - endpoints: ["${l.nodeA}:${l.ifaceA}", "${l.nodeB}:${l.ifaceB}"]`).join('\n')}
-=== END ===
+function buildClabYaml(nodes, links, global) {
+  const ver = global.srosVersion || "25.10.R3";
+  const validLinks = links.filter(l => l.nodeA && l.nodeB);
+  const L = [`name: ${global.labName || "nokia-lab"}`, "", "topology:", "  kinds:",
+    "    nokia_srsim:", `      image: nokia_srsim:${ver}`,
+    "      license: /opt/nokia/sros/license.txt", "", "  nodes:"];
+  nodes.forEach(n => L.push(buildClabNodeBlock(n)));
+  L.push("", "  links:");
+  if (validLinks.length) {
+    validLinks.forEach(l => L.push(`    - endpoints: ["${l.nodeA}:${l.ifaceA}", "${l.nodeB}:${l.ifaceB}"]`));
+  } else {
+    L.push("    []");
+  }
+  return L.join("\n");
+}
 
-CRITICAL RULES:
-- Use EXACT echo statements as shown
-- Follow SR OS 25.10.R3 CLI syntax precisely
-- Include ALL "no shutdown" statements
-- Use proper 4-space indentation within configure blocks
-- Generate router-id from system IP (remove /32)
-- For ISIS: generate system-id from router-id (e.g., 10.0.0.1 → 0100.0000.0001)
-- Include proper BGP families based on service type (vpn-ipv4 for L3VPN, evpn for EVPN)
-- Add auto-bind-tunnel for VPRNs
-- For Containerlab, use Containerlab SR-SIM kind syntax from https://containerlab.dev/manual/kinds/sros/
-- Always use kind: nokia_srsim for SR OS SIM nodes.
-- Always use the selected chassisModel as the node type when present; lowercase it in clab.yml (examples: SR-1 → sr-1, SR-7 → sr-7, IXR-R6 → ixr-r6, XRS-20/XRS-20e → xrs-20/xrs-20e).
-- Use the selected SFM/CPM Type, IOM/Card Type, and MDA Type fields to populate Containerlab components.
-- Non-distributed/integrated nodes: create one node with kind: nokia_srsim, type, startup-config, and only the applicable components overrides. Use mda slot 1 for a selected MDA when no IOM/Card is required.
-- Distributed/chassis nodes such as SR-7, SR-12, SR-14s, SR-2s, SR-2se, XRS-20/XRS-20e, ESS-7, and ESS-12: create one grouped node with kind: nokia_srsim, type, startup-config, and a components list containing CPM/SFM slots and line-card/IOM slots as needed.
-- Do not use the legacy nokia_sros kind and do not use vr-sros images in clab.yml.
-- Include license configuration under topology.kinds.nokia_srsim. Use /opt/nokia/sros/license.txt as the default license path unless the topology JSON provides another path.
-- Do not publish NETCONF/gNMI ports unless explicitly requested; SR-SIM/containerlab can expose management through its normal mgmt network.
-- Complete, production-ready configs only`;
+// Top-level deterministic generator: returns { files:[{name,code}] }.
+function generateConfigs(nodes, links, global) {
+  const files = nodes.map(n => ({ name: `${n.name}.sros.cfg`, code: buildSrosConfig(n, global) }));
+  files.push({ name: `${(global.labName || "nokia-lab")}.clab.yml`, code: buildClabYaml(nodes, links, global) });
+  return { files };
 }
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
@@ -1775,49 +1892,18 @@ function App() {
   const delLink = (i) => setLinks(p => p.filter((_, j) => j !== i));
   const updLink = (i, l) => setLinks(p => p.map((x, j) => j === i ? l : x));
 
-  // Parse output into files
-  const parseFiles = (text) => {
-    const files = [];
-    const regex = /=== FILE: (.+?) ===\n([\s\S]*?)=== END ===/g;
-    let m;
-    while ((m = regex.exec(text)) !== null) {
-      files.push({ name: m[1].trim(), code: m[2].trim() });
-    }
-    return files;
-  };
-
-  const generate = async () => {
+  const generate = () => {
     if (nodes.length === 0) return;
     setLoading(true);
     setError(null);
     setOutput(null);
     setTab("output");
-    setProgress("Starting AI generation...");
 
     try {
-      const prompt = buildPrompt(nodes, links, global);
-      setProgress(`Sending topology, ${links.filter(l=>l.nodeA&&l.nodeB).length} links) to API...`);
-
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 8000,
-          messages: [{ role: "user", content: prompt }],
-        }),
-      });
-
-      if (!res.ok) throw new Error(`API Error: ${res.status}`);
-      const data = await res.json();
-      const text = data.content?.filter(b => b.type === "text").map(b => b.text).join("") || "";
-
-      setProgress("Parsing generated files...");
-      const files = parseFiles(text);
-      if (files.length === 0) throw new Error("Failed to parse files. Unexpected model response.");
-
-      setOutput({ files, raw: text });
-      setProgress(`✓ ${files.length} files generated successfully.`);
+      const { files } = generateConfigs(nodes, links, global);
+      if (files.length === 0) throw new Error("Nothing to generate — add at least one node.");
+      setOutput({ files });
+      setProgress(`✓ ${files.length} files generated.`);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -1825,15 +1911,25 @@ function App() {
     }
   };
 
-  const downloadAll = () => {
+  const saveBlob = (blob, filename) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadAll = async () => {
     if (!output) return;
-    output.files.forEach(f => {
-      const blob = new Blob([f.code], { type: "text/plain" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url; a.download = f.name; a.click();
-      URL.revokeObjectURL(url);
-    });
+    const zipName = `${(global.labName || "nokia-lab")}.zip`;
+    if (typeof JSZip !== "undefined") {
+      const zip = new JSZip();
+      output.files.forEach(f => zip.file(f.name, f.code)); // all files at archive root
+      const blob = await zip.generateAsync({ type: "blob" });
+      saveBlob(blob, zipName);
+    } else {
+      // Fallback: individual downloads if JSZip failed to load.
+      output.files.forEach(f => saveBlob(new Blob([f.code], { type: "text/plain" }), f.name));
+    }
   };
 
   const TABS = [
@@ -1857,7 +1953,7 @@ function App() {
         <div style={{ marginLeft: "auto", display: "flex", gap: 10, alignItems: "center" }}>
           <Badge color={G.accent}>ContainerLAB</Badge>
           <Btn onClick={generate} disabled={loading || nodes.length === 0} variant="success" style={{ padding: "8px 20px", fontSize: 13, letterSpacing: 1.5 }}>
-            {loading ? <span style={{ display: "flex", alignItems: "center", gap: 8 }}><Spinner /> GENERANDO...</span> : "▶ GENERATE CONFIGS"}
+            {loading ? <span style={{ display: "flex", alignItems: "center", gap: 8 }}><Spinner /> GENERATING...</span> : "▶ GENERATE CONFIGS"}
           </Btn>
         </div>
       </div>
@@ -1972,7 +2068,7 @@ function App() {
                   {loading ? progress : output ? `${output.files.length} files ready` : "Press GENERATE CONFIGS to start"}
                 </div>
               </div>
-              {output && <Btn onClick={downloadAll} variant="success">↓ DOWNLOAD ALL</Btn>}
+              {output && <Btn onClick={downloadAll} variant="success">↓ DOWNLOAD ZIP</Btn>}
             </div>
 
             {loading && (
