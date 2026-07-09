@@ -51,13 +51,22 @@ const css = `
 `;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-const NODE_TYPES = ["7750SR", "7250IXR", "7950XRS", "7210SAS", "7705SAR", "7450ESS", "7750DMS", "VSR", "Linux"];
+const NODE_TYPES = ["7750SR", "7250IXR", "7950XRS", "7210SAS", "7705SAR", "7450ESS", "7750DMS", "VSR", "SR Linux", "Linux"];
 const IGP_OPTIONS = ["OSPF", "ISIS", "None"];
 const BGP_ROLES = ["IBGP Route Reflector", "IBGP Peer", "EBGP Peer", "None"];
 const SERVICE_TYPES = ["VPRN", "L3VPN", "VPLS", "Epipe", "EVPN-VPWS", "EVPN-VXLAN", "IES", "None"];
 // SR OS faceplate-connector breakout options (configure port <c> connector breakout <type>).
 // Format c<#ports>-<speed>: e.g. c4-25g = 4x25G, c1-100g = single 100G, c4-100g = 400G QSFP-DD -> 4x100G.
 const BREAKOUT_OPTIONS = ["None", "c1-400g", "c1-100g", "c1-40g", "c1-10g", "c1-1g", "c2-100g", "c4-100g", "c4-25g", "c4-10g"];
+// Breakouts each faceplate-connector family can do. Single-lane connectors
+// (sfp28/sfp+/sfp) are direct ports and are intentionally absent — no breakout.
+const CONNECTOR_BREAKOUTS = {
+  qsfpdd: ["c1-400g", "c1-100g", "c4-100g", "c2-100g", "c1-40g", "c4-25g", "c4-10g"],
+  qsfp28: ["c1-100g", "c1-40g", "c4-25g", "c4-10g"],
+  "qsfp+": ["c1-40g", "c4-10g"],
+  cfp8: ["c1-400g", "c1-100g"],
+  cfp2: ["c1-100g"],
+};
 const LINK_TYPES = ["Link", "LAG", "None"];
 const HARDWARE_DB = {
   "source": {
@@ -1102,6 +1111,7 @@ const PLATFORM_CHASSIS_MATCHERS = {
   "7950XRS": chassis => chassis.startsWith("XRS-"),
   "VSR": chassis => chassis.startsWith("VSR-"),
   "7210SAS": () => false,
+  "SR Linux": () => false,
   "Linux": () => false,
 };
 
@@ -1135,6 +1145,50 @@ function hardwareOptionsForNode(node) {
     return HARDWARE_DB.chassis[node.chassisModel];
   }
   return hardwareOptionsForPlatform(node.type);
+}
+
+// A selected chassis is "integrated" (fixed pizza-box) when its DB entry has no
+// line card — those models can't take CPM/SFM modules or separate IOMs.
+// Platform-only (no chassis chosen) returns false so controls stay unlocked.
+function chassisIsIntegrated(node) {
+  const model = (node.chassisModel && node.chassisModel !== "None") ? node.chassisModel : null;
+  const hw = model ? HARDWARE_DB.chassis[model] : null;
+  if (!hw) return false;
+  return !(hw.iomCardTypes || []).some(v => v && v !== "None");
+}
+
+// Breakout-capable connector families named in an MDA type (e.g. "…qsfp28").
+function connectorFamilies(mdaType) {
+  const s = String(mdaType || "").toLowerCase();
+  const fam = [];
+  if (/qsfp-?dd/.test(s)) fam.push("qsfpdd");
+  if (/qsfp28/.test(s)) fam.push("qsfp28");
+  if (/qsfp\+/.test(s)) fam.push("qsfp+");
+  if (/cfp8/.test(s)) fam.push("cfp8");
+  if (/cfp2/.test(s)) fam.push("cfp2");
+  return fam;
+}
+
+// Breakout choices valid for an MDA type. Unknown/None -> full list (permissive);
+// an MDA with no breakout-capable connector -> ["None"].
+function breakoutOptionsFor(mdaType) {
+  if (!mdaType || mdaType === "None") return BREAKOUT_OPTIONS;
+  const fams = connectorFamilies(mdaType);
+  if (!fams.length) return ["None"];
+  const out = [];
+  fams.forEach(f => (CONNECTOR_BREAKOUTS[f] || []).forEach(b => { if (!out.includes(b)) out.push(b); }));
+  return ["None", ...out];
+}
+
+// Resolve the MDA type serving a port id (card slot + mda slot before the cX connector).
+function mdaTypeForPort(node, portName) {
+  const parts = String(portName || "").split("/");
+  const ci = parts.findIndex(p => /^c\d+$/.test(p));
+  if (ci < 1) return null;
+  const card = (node.cards || []).find(c => String(c.slot) === String(parts[0]));
+  if (!card) return null;
+  const mda = (card.mdas || []).find(m => String(m.slot) === String(parts[ci - 1]));
+  return mda ? mda.type : null;
 }
 
 // Hardware default: one line card in slot 1 with one MDA in slot 1, no CPM/SFM.
@@ -1319,6 +1373,7 @@ function NodeEditor({ node, onChange, onDelete, index }) {
   const upd = (k, v) => onChange({ ...node, [k]: v });
   const chassisOptions = chassisOptionsForPlatform(node.type);
   const hardwareOptions = hardwareOptionsForNode(node);
+  const integrated = chassisIsIntegrated(node);
   // Changing platform/chassis invalidates prior card selections -> reset to a clean default.
   const setPlatform = (type) => onChange({ ...node, type, chassisModel: "None", cpms: [], cards: defaultCards() });
   const setChassisModel = (chassisModel) => onChange({ ...node, chassisModel, cpms: [], cards: defaultCards() });
@@ -1380,39 +1435,47 @@ function NodeEditor({ node, onChange, onDelete, index }) {
           <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
             <div><Label>Chassis Model</Label><Select value={chassisOptions.includes(node.chassisModel) ? node.chassisModel : "None"} onChange={setChassisModel} options={chassisOptions} /></div>
           </div>
-          {/* Hardware — CPM/SFM modules + line cards with MDAs */}
+          {/* Hardware — CPM/SFM modules + line cards with MDAs.
+              Integrated chassis are locked to MDAs only (no CPM/SFM, no IOM). */}
           <div style={{ border: `1px solid ${G.border}`, padding: 10, display: "grid", gap: 10 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <Label>CPM / SFM Modules</Label>
-              <Btn onClick={addCpm} variant="ghost" style={{ padding: "3px 10px", fontSize: 11 }}>+ CPM/SFM</Btn>
-            </div>
-            {cpms.length === 0 && <div style={{ fontSize: 11, color: G.textMuted }}>None — integrated chassis or containerlab default.</div>}
-            {cpms.map((c, i) => (
-              <div key={i} style={{ display: "grid", gridTemplateColumns: "0.6fr 3fr auto", gap: 8 }}>
-                <Input value={c.slot} onChange={v => updCpm(i, "slot", v)} placeholder="A" mono />
-                <Select value={hardwareOptions.sfmCpmTypes.includes(c.type) ? c.type : "None"} onChange={v => updCpm(i, "type", v)} options={hardwareOptions.sfmCpmTypes} />
-                <Btn onClick={() => delCpm(i)} variant="danger" style={{ padding: "3px 10px", fontSize: 11 }}>✕</Btn>
-              </div>
-            ))}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
-              <Label>Line Cards (IOM) + MDAs</Label>
-              <Btn onClick={addCard} variant="ghost" style={{ padding: "3px 10px", fontSize: 11 }}>+ CARD</Btn>
-            </div>
-            {cards.map((card, ci) => (
-              <div key={ci} style={{ border: `1px solid ${G.border}`, padding: 8, display: "grid", gap: 6 }}>
-                <div style={{ display: "grid", gridTemplateColumns: "0.6fr 3fr auto", gap: 8, alignItems: "center" }}>
-                  <Input value={card.slot} onChange={v => updCard(ci, "slot", v)} placeholder="1" mono />
-                  <Select value={hardwareOptions.iomCardTypes.includes(card.type) ? card.type : "None"} onChange={v => updCard(ci, "type", v)} options={hardwareOptions.iomCardTypes} />
-                  <Btn onClick={() => delCard(ci)} variant="danger" style={{ padding: "3px 10px", fontSize: 11 }}>✕ CARD</Btn>
+            {!integrated && (
+              <>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <Label>CPM / SFM Modules</Label>
+                  <Btn onClick={addCpm} variant="ghost" style={{ padding: "3px 10px", fontSize: 11 }}>+ CPM/SFM</Btn>
                 </div>
+                {cpms.length === 0 && <div style={{ fontSize: 11, color: G.textMuted }}>None — containerlab default.</div>}
+                {cpms.map((c, i) => (
+                  <div key={i} style={{ display: "grid", gridTemplateColumns: "0.6fr 3fr auto", gap: 8 }}>
+                    <Input value={c.slot} onChange={v => updCpm(i, "slot", v)} placeholder="A" mono />
+                    <Select value={hardwareOptions.sfmCpmTypes.includes(c.type) ? c.type : "None"} onChange={v => updCpm(i, "type", v)} options={hardwareOptions.sfmCpmTypes} />
+                    <Btn onClick={() => delCpm(i)} variant="danger" style={{ padding: "3px 10px", fontSize: 11 }}>✕</Btn>
+                  </div>
+                ))}
+              </>
+            )}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: integrated ? 0 : 4 }}>
+              <Label>{integrated ? "MDAs (fixed card 1)" : "Line Cards (IOM) + MDAs"}</Label>
+              {!integrated && <Btn onClick={addCard} variant="ghost" style={{ padding: "3px 10px", fontSize: 11 }}>+ CARD</Btn>}
+            </div>
+            {integrated && <div style={{ fontSize: 11, color: G.textMuted }}>Integrated chassis — MDAs only.</div>}
+            {(integrated ? cards.slice(0, 1) : cards).map((card, ci) => (
+              <div key={ci} style={{ border: `1px solid ${G.border}`, padding: 8, display: "grid", gap: 6 }}>
+                {!integrated && (
+                  <div style={{ display: "grid", gridTemplateColumns: "0.6fr 3fr auto", gap: 8, alignItems: "center" }}>
+                    <Input value={card.slot} onChange={v => updCard(ci, "slot", v)} placeholder="1" mono />
+                    <Select value={hardwareOptions.iomCardTypes.includes(card.type) ? card.type : "None"} onChange={v => updCard(ci, "type", v)} options={hardwareOptions.iomCardTypes} />
+                    <Btn onClick={() => delCard(ci)} variant="danger" style={{ padding: "3px 10px", fontSize: 11 }}>✕ CARD</Btn>
+                  </div>
+                )}
                 {(card.mdas || []).map((m, mi) => (
-                  <div key={mi} style={{ display: "grid", gridTemplateColumns: "0.6fr 3fr auto", gap: 8, paddingLeft: 18 }}>
+                  <div key={mi} style={{ display: "grid", gridTemplateColumns: "0.6fr 3fr auto", gap: 8, paddingLeft: integrated ? 0 : 18 }}>
                     <Input value={m.slot} onChange={v => updMda(ci, mi, "slot", v)} placeholder="1" mono />
                     <Select value={hardwareOptions.mdaTypes.includes(m.type) ? m.type : "None"} onChange={v => updMda(ci, mi, "type", v)} options={hardwareOptions.mdaTypes} />
                     <Btn onClick={() => delMda(ci, mi)} variant="danger" style={{ padding: "3px 8px", fontSize: 11 }}>✕</Btn>
                   </div>
                 ))}
-                <div style={{ paddingLeft: 18 }}>
+                <div style={{ paddingLeft: integrated ? 0 : 18 }}>
                   <Btn onClick={() => addMda(ci)} variant="ghost" style={{ padding: "2px 10px", fontSize: 11 }}>+ MDA</Btn>
                 </div>
               </div>
@@ -1459,7 +1522,10 @@ function NodeEditor({ node, onChange, onDelete, index }) {
                 <Input value={iface.name} onChange={v => updIface(i, "name", v)} placeholder="1/1/c1/1" mono />
                 <Input value={iface.ip} onChange={v => updIface(i, "ip", v)} placeholder="192.168.1.1/30" mono />
                 <Select value={iface.role} onChange={v => updIface(i, "role", v)} options={["network", "hybrid", "access"]} />
-                <Select value={iface.breakout || "None"} onChange={v => updIface(i, "breakout", v)} options={BREAKOUT_OPTIONS} />
+                {(() => {
+                  const boOpts = breakoutOptionsFor(mdaTypeForPort(node, iface.name));
+                  return <Select value={boOpts.includes(iface.breakout) ? iface.breakout : "None"} onChange={v => updIface(i, "breakout", v)} options={boOpts} />;
+                })()}
                 <Input value={iface.ifaceName} onChange={v => updIface(i, "ifaceName", v)} placeholder="to-CORE1" mono />
                 <Btn onClick={() => delIface(i)} variant="danger" style={{ padding: "3px 10px", fontSize: 11 }}>✕</Btn>
               </div>
@@ -1527,6 +1593,15 @@ function chassisModelOf(node) {
 function clabTypeOf(node) {
   const base = chassisModelOf(node) || node.type;
   return String(base).toLowerCase().replace(/_/g, "-");
+}
+
+// Containerlab node kind from the platform type. SR OS platforms -> nokia_srsim;
+// "Linux" -> linux; "SR Linux" -> nokia_srlinux.
+function clabKindOf(node) {
+  const t = String(node.type || "");
+  if (t === "Linux") return "linux";
+  if (t === "SR Linux" || t === "SRLinux") return "nokia_srlinux";
+  return "nokia_srsim";
 }
 
 function pick(v) { return (v && v !== "None") ? v : null; }
@@ -1807,6 +1882,17 @@ function buildSrosConfig(node, global) {
 
 // ── Containerlab .clab.yml ────────────────────────────────────────────────────
 function buildClabNodeBlock(node) {
+  const kind = clabKindOf(node);
+  // Non-SR OS kinds: simple blocks, image inherited from topology.kinds.
+  if (kind === "linux") {
+    return [`    ${node.name}:`, "      kind: linux", "      cap-add:", "        - NET_ADMIN"].join("\n");
+  }
+  if (kind === "nokia_srlinux") {
+    const L = [`    ${node.name}:`, "      kind: nokia_srlinux"];
+    const t = chassisModelOf(node);
+    if (t) L.push(`      type: ${String(t).toLowerCase().replace(/_/g, "-")}`);
+    return L.join("\n");
+  }
   const type = clabTypeOf(node);
   const cpms = nodeCpms(node);
   const cards = nodeCards(node);
@@ -1851,23 +1937,36 @@ function buildClabNodeBlock(node) {
 
 function buildClabYaml(nodes, links, global) {
   const ver = global.srosVersion || "25.10.R3";
+  const licensePath = (global.licensePath && global.licensePath.trim()) || "/opt/nokia/sros/license.txt";
   const validLinks = links.filter(l => l.nodeA && l.nodeB);
-  const L = [`name: ${global.labName || "nokia-lab"}`, "", "topology:", "  kinds:",
-    "    nokia_srsim:", `      image: nokia_srsim:${ver}`,
-    "      license: /opt/nokia/sros/license.txt", "", "  nodes:"];
+  const kinds = new Set(nodes.map(clabKindOf));
+  const L = [`name: ${global.labName || "nokia-lab"}`, "", "topology:", "  kinds:"];
+  if (kinds.has("nokia_srsim")) {
+    L.push("    nokia_srsim:", `      image: nokia_srsim:${ver}`, `      license: ${licensePath}`);
+  }
+  if (kinds.has("nokia_srlinux")) {
+    L.push("    nokia_srlinux:", "      image: ghcr.io/nokia/srlinux:latest");
+  }
+  if (kinds.has("linux")) {
+    L.push("    linux:", "      image: ghcr.io/srl-labs/network-multitool:latest");
+  }
+  L.push("", "  nodes:");
   nodes.forEach(n => L.push(buildClabNodeBlock(n)));
-  L.push("", "  links:");
+  const ep = (node, iface) => `${String(node).trim()}:${String(iface || "").trim()}`;
   if (validLinks.length) {
-    validLinks.forEach(l => L.push(`    - endpoints: ["${l.nodeA}:${l.ifaceA}", "${l.nodeB}:${l.ifaceB}"]`));
+    L.push("", "  links:");
+    validLinks.forEach(l => L.push(`    - endpoints: [ "${ep(l.nodeA, l.ifaceA)}", "${ep(l.nodeB, l.ifaceB)}" ]`));
   } else {
-    L.push("    []");
+    L.push("", "  links: []");
   }
   return L.join("\n");
 }
 
 // Top-level deterministic generator: returns { files:[{name,code}] }.
 function generateConfigs(nodes, links, global) {
-  const files = nodes.map(n => ({ name: `${n.name}.sros.cfg`, code: buildSrosConfig(n, global) }));
+  // Only SR OS (nokia_srsim) nodes get a startup-config; linux/srlinux do not.
+  const files = nodes.filter(n => clabKindOf(n) === "nokia_srsim")
+    .map(n => ({ name: `${n.name}.sros.cfg`, code: buildSrosConfig(n, global) }));
   files.push({ name: `${(global.labName || "nokia-lab")}.clab.yml`, code: buildClabYaml(nodes, links, global) });
   return { files };
 }
@@ -1877,7 +1976,7 @@ function App() {
   const [tab, setTab] = useState("topology"); // topology | links | global | output
   const [nodes, setNodes] = useState([defaultNode(1), defaultNode(2)]);
   const [links, setLinks] = useState([defaultLink(1)]);
-  const [global, setGlobal] = useState({ labName: "nokia-lab", srosVersion: "25.10.R3", ipPool: "10.0.0.0/8" });
+  const [global, setGlobal] = useState({ labName: "nokia-lab", srosVersion: "25.10.R3", ipPool: "10.0.0.0/8", licensePath: "/opt/nokia/sros/license.txt" });
   const [loading, setLoading] = useState(false);
   const [output, setOutput] = useState(null);
   const [error, setError] = useState(null);
@@ -1948,7 +2047,7 @@ function App() {
           <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 20, fontWeight: 700, color: G.accent, letterSpacing: 2 }}>
             ApexTopology
           </div>
-          <div style={{ fontSize: 10, color: G.textMuted, letterSpacing: 2, fontFamily: "'JetBrains Mono',monospace" }}>Nokia SR OS Configuration Generator v0.9</div>
+          <div style={{ fontSize: 10, color: G.textMuted, letterSpacing: 2, fontFamily: "'JetBrains Mono',monospace" }}>Nokia SR OS Configuration Generator v0.9.10</div>
         </div>
         <div style={{ marginLeft: "auto", display: "flex", gap: 10, alignItems: "center" }}>
           <Badge color={G.accent}>ContainerLAB</Badge>
@@ -2039,6 +2138,7 @@ function App() {
                 <Select value={global.srosVersion} onChange={v => setGlobal(p => ({ ...p, srosVersion: v }))} options={["23.3.R2", "23.7.R1", "23.10.R2", "24.3.R2", "24.7.R1", "24.10.R1", "25.3.R1", "25.7.R1", "25.10.R3"]} />
               </div>
               <div><Label>IP Pool</Label><Input value={global.ipPool} onChange={v => setGlobal(p => ({ ...p, ipPool: v }))} placeholder="10.0.0.0/8" mono /></div>
+              <div><Label>SR OS License Path</Label><Input value={global.licensePath} onChange={v => setGlobal(p => ({ ...p, licensePath: v }))} placeholder="/opt/nokia/sros/license.txt" mono /></div>
             </div>
             <div style={{ marginTop: 16, background: G.card, border: `1px solid ${G.border}`, borderRadius: 10, padding: 16 }}>
               <Label>Topology Summary</Label>
@@ -2121,7 +2221,7 @@ function App() {
       {/* Footer */}
       <div style={{ background: G.panel, borderTop: `1px solid ${G.border}`, padding: "8px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <span style={{ fontSize: 11, color: G.textMuted, fontFamily: "'JetBrains Mono',monospace" }}>
-          ApexTopology v0.9 · Nokia SR OS 25.10.R3 · Configuration Generator
+          ApexTopology v0.9.10 · Nokia SR OS 25.10.R3 · Configuration Generator
         </span>
         <div style={{ display: "flex", gap: 8 }}>
           <div style={{ width: 6, height: 6, borderRadius: "50%", background: G.accent2, animation: "pulse 2s infinite" }} />
