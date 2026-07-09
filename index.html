@@ -58,6 +58,9 @@ const SERVICE_TYPES = ["VPRN", "L3VPN", "VPLS", "Epipe", "EVPN-VPWS", "EVPN-VXLA
 // SR OS faceplate-connector breakout options (configure port <c> connector breakout <type>).
 // Format c<#ports>-<speed>: e.g. c4-25g = 4x25G, c1-100g = single 100G, c4-100g = 400G QSFP-DD -> 4x100G.
 const BREAKOUT_OPTIONS = ["None", "c1-400g", "c1-100g", "c1-40g", "c1-10g", "c1-1g", "c2-100g", "c4-100g", "c4-25g", "c4-10g"];
+// Port encapsulation. Default is dot1q for hybrid ports, null for access/network.
+const ENCAP_OPTIONS = ["null", "dot1q", "qinq"];
+const defaultEncapFor = (role) => (role === "hybrid" ? "dot1q" : "null");
 // Breakouts each faceplate-connector family can do. Single-lane connectors
 // (sfp28/sfp+/sfp) are direct ports and are intentionally absent — no breakout.
 const CONNECTOR_BREAKOUTS = {
@@ -1237,7 +1240,7 @@ const defaultNode = (id, num = id) => ({
   service: "None",
   customerId: "",
   rdRt: "",
-  interfaces: [{ name: "1/1/c1/1", ip: `192.168.${num}.1/30`, role: "network", breakout: "None", ifaceName: "" }],
+  interfaces: [{ name: "1/1/c1/1", vlan: "", ip: `192.168.${num}.1/30`, role: "network", encap: "null", breakout: "None", ifaceName: "" }],
 });
 
 // Smallest NODE number (>=1) not currently used, so re-adds fill the gap.
@@ -1313,7 +1316,11 @@ function Select({ value, onChange, options, style = {} }) {
         ...style,
       }}
     >
-      {options.map(o => <option key={o} value={o}>{o}</option>)}
+      {options.map(o => {
+        const val = (o && typeof o === "object") ? o.value : o;
+        const lab = (o && typeof o === "object") ? o.label : o;
+        return <option key={val} value={val}>{lab}</option>;
+      })}
     </select>
   );
 }
@@ -1411,7 +1418,12 @@ function NodeEditor({ node, onChange, onDelete, index }) {
     ifaces[i] = { ...ifaces[i], [k]: v };
     upd("interfaces", ifaces);
   };
-  const addIface = () => upd("interfaces", [...node.interfaces, { name: "", ip: "", role: "network", breakout: "None", ifaceName: "" }]);
+  const updIfaceMulti = (i, patch) => {
+    const ifaces = [...node.interfaces];
+    ifaces[i] = { ...ifaces[i], ...patch };
+    upd("interfaces", ifaces);
+  };
+  const addIface = () => upd("interfaces", [...node.interfaces, { name: "", vlan: "", ip: "", role: "network", encap: "null", breakout: "None", ifaceName: "" }]);
   const delIface = (i) => upd("interfaces", node.interfaces.filter((_, j) => j !== i));
 
   // ── CPM/SFM module handlers ──
@@ -1540,17 +1552,19 @@ function NodeEditor({ node, onChange, onDelete, index }) {
               <Btn onClick={addIface} variant="success" style={{ padding: "3px 10px", fontSize: 11 }}>+ ADD</Btn>
             </div>
             {node.interfaces.length > 0 && (
-              <div style={{ display: "grid", gridTemplateColumns: "2fr 2fr 1.3fr 1.6fr 1.6fr auto", gap: 8, marginBottom: 4 }}>
-                {["Port ID", "IP / Prefix", "Role", "Breakout", "Interface Name", ""].map((h, k) => (
+              <div style={{ display: "grid", gridTemplateColumns: "1.5fr 0.7fr 1.6fr 1.1fr 1fr 1.3fr 1.4fr auto", gap: 8, marginBottom: 4 }}>
+                {["Port ID", "VLAN", "IP / Prefix", "Role", "Encap", "Breakout", "Interface Name", ""].map((h, k) => (
                   <span key={k} style={{ fontSize: 10, color: G.textMuted, fontFamily: "'JetBrains Mono',monospace", letterSpacing: 0.5 }}>{h}</span>
                 ))}
               </div>
             )}
             {node.interfaces.map((iface, i) => (
-              <div key={i} style={{ display: "grid", gridTemplateColumns: "2fr 2fr 1.3fr 1.6fr 1.6fr auto", gap: 8, marginBottom: 6, animation: "slideIn .2s ease" }}>
+              <div key={i} style={{ display: "grid", gridTemplateColumns: "1.5fr 0.7fr 1.6fr 1.1fr 1fr 1.3fr 1.4fr auto", gap: 8, marginBottom: 6, animation: "slideIn .2s ease" }}>
                 <Input value={iface.name} onChange={v => updIface(i, "name", v)} placeholder="1/1/c1/1" mono />
+                <Input value={iface.vlan} onChange={v => { const patch = { vlan: v }; if (v && (!iface.encap || iface.encap === "null")) patch.encap = "dot1q"; updIfaceMulti(i, patch); }} placeholder="100" mono />
                 <Input value={iface.ip} onChange={v => updIface(i, "ip", v)} placeholder="192.168.1.1/30" mono />
-                <Select value={iface.role} onChange={v => updIface(i, "role", v)} options={["network", "hybrid", "access"]} />
+                <Select value={iface.role} onChange={v => updIfaceMulti(i, { role: v, encap: defaultEncapFor(v) })} options={["network", "hybrid", "access"]} />
+                <Select value={ENCAP_OPTIONS.includes(iface.encap) ? iface.encap : "null"} onChange={v => updIface(i, "encap", v)} options={ENCAP_OPTIONS} />
                 {(() => {
                   const boOpts = breakoutOptionsFor(mdaTypeForPort(node, iface.name));
                   return <Select value={boOpts.includes(iface.breakout) ? iface.breakout : "None"} onChange={v => updIface(i, "breakout", v)} options={boOpts} />;
@@ -1574,12 +1588,13 @@ function NodeEditor({ node, onChange, onDelete, index }) {
 // ─── Link Editor ─────────────────────────────────────────────────────────────
 function LinkEditor({ link, onChange, onDelete, nodes }) {
   const upd = (k, v) => onChange({ ...link, [k]: v });
-  const nodeNames = nodes.map(n => n.name);
+  // Reference nodes by stable id (label shows current name), so renames propagate.
+  const nodeOpts = [{ value: "", label: "—" }, ...nodes.map(n => ({ value: String(n.id), label: n.name }))];
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr auto", gap: 8, marginBottom: 8, animation: "slideIn .2s ease" }}>
-      <Select value={link.nodeA} onChange={v => upd("nodeA", v)} options={["", ...nodeNames]} />
+      <Select value={String(link.nodeA ?? "")} onChange={v => upd("nodeA", v)} options={nodeOpts} />
       <Input value={link.ifaceA} onChange={v => upd("ifaceA", v)} placeholder="eth0 / 1/1/c1/1" mono />
-      <Select value={link.nodeB} onChange={v => upd("nodeB", v)} options={["", ...nodeNames]} />
+      <Select value={String(link.nodeB ?? "")} onChange={v => upd("nodeB", v)} options={nodeOpts} />
       <Input value={link.ifaceB} onChange={v => upd("ifaceB", v)} placeholder="eth0 / 1/1/c1/1" mono />
       <Select value={link.type} onChange={v => upd("type", v)} options={LINK_TYPES} />
       <Btn onClick={onDelete} variant="danger" style={{ padding: "3px 10px", fontSize: 11 }}>✕</Btn>
@@ -1648,6 +1663,13 @@ function connectorOf(name) {
   const parts = String(name || "").split("/");
   const idx = parts.findIndex(p => /^c\d+$/.test(p));
   return idx === -1 ? null : parts.slice(0, idx + 1).join("/");
+}
+
+// Router-interface port binding: port-id plus ":vlan" when a VLAN is set. The
+// physical Port Configuration uses the bare port id (a ":vlan" there is invalid).
+function portBinding(i) {
+  const v = pick(i.vlan);
+  return v ? `${i.name}:${String(v).trim()}` : i.name;
 }
 
 // A node is "distributed" (chassis-based, needs CPM/line-card slots) when its
@@ -1723,7 +1745,7 @@ function srosRouterBaseInner(node) {
   (node.interfaces || []).filter(i => i.name).forEach(i => {
     L.push(`        interface "${ifName(i)}"`);
     if (i.ip) L.push(`            address ${i.ip}`);
-    L.push(`            port ${i.name}`, "            no shutdown", "        exit");
+    L.push(`            port ${portBinding(i)}`, "            no shutdown", "        exit");
   });
   return L.join("\n");
 }
@@ -1875,12 +1897,16 @@ function srosPorts(node) {
   if (!ifaces.length) return null;
   const L = ["#--------------------------------------------------", 'echo "Port Configuration"',
     "#--------------------------------------------------"];
+  // One stanza per physical port (bare id). VLAN sub-interfaces share the port,
+  // so dedupe — the first interface on a port sets its mode/encap.
+  const seen = {};
   ifaces.forEach(i => {
-    L.push(`    port ${i.name}`);
-    if (i.role === "access" || i.role === "hybrid") {
-      L.push("        ethernet", `            mode ${i.role}`, "            encap-type dot1q", "        exit");
-    }
-    L.push("        no shutdown", "    exit");
+    if (seen[i.name]) return;
+    seen[i.name] = true;
+    const mode = i.role || "network";
+    const encap = pick(i.encap) || defaultEncapFor(mode);
+    L.push(`    port ${i.name}`, "        ethernet", `            mode ${mode}`,
+      `            encap-type ${encap}`, "        exit", "        no shutdown", "    exit");
   });
   return L.join("\n");
 }
@@ -1922,14 +1948,16 @@ function buildClabNodeBlock(node) {
     if (t) L.push(`      type: ${String(t).toLowerCase().replace(/_/g, "-")}`);
     return L.join("\n");
   }
-  const type = clabTypeOf(node);
   const cpms = nodeCpms(node);
   const cards = nodeCards(node);
   // SFM type (numeric-slot or *sfm* module) is passed to line cards via env.
   const sfmType = (cpms.find(c => /sfm/i.test(c.type)) ||
                    cpms.find(c => !isCpmSlot(c.slot)) || {}).type || null;
-  const L = [`    ${node.name}:`, "      kind: nokia_srsim", `      type: ${type}`,
-    `      startup-config: ${node.name}.sros.cfg`];
+  const L = [`    ${node.name}:`, "      kind: nokia_srsim"];
+  // Only emit `type:` for a real chassis; a platform family (e.g. 7750sr) is not
+  // a valid containerlab type. With no type, SR-SIM defaults to SR-1.
+  if (chassisModelOf(node)) L.push(`      type: ${clabTypeOf(node)}`);
+  L.push(`      startup-config: ${node.name}.sros.cfg`);
   if (isDistributedNode(node)) {
     L.push("      components:");
     // CPM components (alpha slots). Fall back to A(/B) when none specified.
@@ -1967,7 +1995,10 @@ function buildClabNodeBlock(node) {
 function buildClabYaml(nodes, links, global) {
   const ver = global.srosVersion || "25.10.R3";
   const licensePath = (global.licensePath && global.licensePath.trim()) || "/opt/nokia/sros/license.txt";
-  const validLinks = links.filter(l => l.nodeA && l.nodeB);
+  // Links reference nodes by id; resolve to the node's current name so renames
+  // are always reflected. A link needs both endpoints (node + interface) set.
+  const nameById = new Map(nodes.map(n => [String(n.id), n.name]));
+  const validLinks = links.filter(l => nameById.has(String(l.nodeA)) && nameById.has(String(l.nodeB)) && l.ifaceA && l.ifaceB);
   const kinds = new Set(nodes.map(clabKindOf));
   const L = [`name: ${global.labName || "nokia-lab"}`, "", "topology:", "  kinds:"];
   if (kinds.has("nokia_srsim")) {
@@ -1982,11 +2013,10 @@ function buildClabYaml(nodes, links, global) {
   L.push("", "  nodes:");
   nodes.forEach(n => L.push(buildClabNodeBlock(n)));
   const ep = (node, iface) => `${String(node).trim()}:${String(iface || "").trim()}`;
+  // Omit the links key entirely when there are none (a bare `links: []` is noise).
   if (validLinks.length) {
     L.push("", "  links:");
-    validLinks.forEach(l => L.push(`    - endpoints: [ "${ep(l.nodeA, l.ifaceA)}", "${ep(l.nodeB, l.ifaceB)}" ]`));
-  } else {
-    L.push("", "  links: []");
+    validLinks.forEach(l => L.push(`    - endpoints: [ "${ep(nameById.get(String(l.nodeA)), l.ifaceA)}", "${ep(nameById.get(String(l.nodeB)), l.ifaceB)}" ]`));
   }
   return L.join("\n");
 }
@@ -2004,7 +2034,7 @@ function generateConfigs(nodes, links, global) {
 function App() {
   const [tab, setTab] = useState("topology"); // topology | links | global | output
   const [nodes, setNodes] = useState([defaultNode(1), defaultNode(2)]);
-  const [links, setLinks] = useState([defaultLink(1)]);
+  const [links, setLinks] = useState([{ id: 1, nodeA: "1", ifaceA: "1/1/c1/1", nodeB: "2", ifaceB: "1/1/c1/1", type: "Link" }]);
   const [global, setGlobal] = useState({ labName: "nokia-lab", srosVersion: "25.10.R3", ipPool: "10.0.0.0/8", licensePath: "/opt/nokia/sros/license.txt" });
   const [loading, setLoading] = useState(false);
   const [output, setOutput] = useState(null);
