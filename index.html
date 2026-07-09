@@ -1969,14 +1969,16 @@ function buildClabNodeBlock(node) {
       if (DUAL_CPM_CHASSIS.has(chassisModelOf(node))) L.push("        - slot: B");
     }
     // Line-card components. Fall back to a single slot 1 when none specified.
+    // Card/SFM/MDA are all set via env (NOKIA_SROS_CARD/SFM/MDA_n); per the
+    // containerlab docs, when overriding any one, all should be included together.
     const lineCards = cards.length ? cards : [{ slot: "1", type: "None", mdas: [] }];
     lineCards.forEach(card => {
       L.push(`        - slot: ${card.slot}`);
-      if (pick(card.type)) L.push(`          type: ${card.type}`);
+      const cardType = pick(card.type);
       const mdas = (card.mdas || []).filter(m => pick(m.type));
-      // Per containerlab docs: when overriding card/mda, SFM + MDA env must be set.
-      if (sfmType || mdas.length) {
+      if (cardType || sfmType || mdas.length) {
         L.push("          env:");
+        if (cardType) L.push(`            NOKIA_SROS_CARD: ${cardType}`);
         if (sfmType) L.push(`            NOKIA_SROS_SFM: ${sfmType}`);
         mdas.forEach(m => L.push(`            NOKIA_SROS_MDA_${m.slot}: ${m.type}`));
       }
@@ -1995,6 +1997,7 @@ function buildClabNodeBlock(node) {
 function buildClabYaml(nodes, links, global) {
   const ver = global.srosVersion || "25.10.R3";
   const licensePath = (global.licensePath && global.licensePath.trim()) || "/opt/nokia/sros/license.txt";
+  const srsimImage = (global.srsimImage && global.srsimImage.trim()) || `nokia_srsim:${ver}`;
   // Links reference nodes by id; resolve to the node's current name so renames
   // are always reflected. A link needs both endpoints (node + interface) set.
   const nameById = new Map(nodes.map(n => [String(n.id), n.name]));
@@ -2002,7 +2005,7 @@ function buildClabYaml(nodes, links, global) {
   const kinds = new Set(nodes.map(clabKindOf));
   const L = [`name: ${global.labName || "nokia-lab"}`, "", "topology:", "  kinds:"];
   if (kinds.has("nokia_srsim")) {
-    L.push("    nokia_srsim:", `      image: nokia_srsim:${ver}`, `      license: ${licensePath}`);
+    L.push("    nokia_srsim:", `      image: ${srsimImage}`, `      license: ${licensePath}`);
   }
   if (kinds.has("nokia_srlinux")) {
     L.push("    nokia_srlinux:", "      image: ghcr.io/nokia/srlinux:latest");
@@ -2035,7 +2038,7 @@ function App() {
   const [tab, setTab] = useState("topology"); // topology | links | global | output
   const [nodes, setNodes] = useState([defaultNode(1), defaultNode(2)]);
   const [links, setLinks] = useState([{ id: 1, nodeA: "1", ifaceA: "1/1/c1/1", nodeB: "2", ifaceB: "1/1/c1/1", type: "Link" }]);
-  const [global, setGlobal] = useState({ labName: "nokia-lab", srosVersion: "25.10.R3", ipPool: "10.0.0.0/8", licensePath: "/opt/nokia/sros/license.txt" });
+  const [global, setGlobal] = useState({ labName: "nokia-lab", srosVersion: "25.10.R3", ipPool: "10.0.0.0/8", licensePath: "/opt/nokia/sros/license.txt", srsimImage: "" });
   const [loading, setLoading] = useState(false);
   const [output, setOutput] = useState(null);
   const [error, setError] = useState(null);
@@ -2106,7 +2109,7 @@ function App() {
           <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 20, fontWeight: 700, color: G.accent, letterSpacing: 2 }}>
             ApexTopology
           </div>
-          <div style={{ fontSize: 10, color: G.textMuted, letterSpacing: 2, fontFamily: "'JetBrains Mono',monospace" }}>Nokia SR OS Configuration Generator v0.9.20</div>
+          <div style={{ fontSize: 10, color: G.textMuted, letterSpacing: 2, fontFamily: "'JetBrains Mono',monospace" }}>Nokia SR OS Configuration Generator v0.9.30</div>
         </div>
         <div style={{ marginLeft: "auto", display: "flex", gap: 10, alignItems: "center" }}>
           <Badge color={G.accent}>ContainerLAB</Badge>
@@ -2198,6 +2201,7 @@ function App() {
               </div>
               <div><Label>IP Pool</Label><Input value={global.ipPool} onChange={v => setGlobal(p => ({ ...p, ipPool: v }))} placeholder="10.0.0.0/8" mono /></div>
               <div><Label>SR OS License Path</Label><Input value={global.licensePath} onChange={v => setGlobal(p => ({ ...p, licensePath: v }))} placeholder="/opt/nokia/sros/license.txt" mono /></div>
+              <div><Label>SR-SIM Image (blank = nokia_srsim:{global.srosVersion})</Label><Input value={global.srsimImage} onChange={v => setGlobal(p => ({ ...p, srsimImage: v }))} placeholder={`nokia_srsim:${global.srosVersion}`} mono /></div>
             </div>
             <div style={{ marginTop: 16, background: G.card, border: `1px solid ${G.border}`, borderRadius: 10, padding: 16 }}>
               <Label>Topology Summary</Label>
@@ -2280,7 +2284,7 @@ function App() {
       {/* Footer */}
       <div style={{ background: G.panel, borderTop: `1px solid ${G.border}`, padding: "8px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <span style={{ fontSize: 11, color: G.textMuted, fontFamily: "'JetBrains Mono',monospace" }}>
-          ApexTopology v0.9.20 · Nokia SR OS 25.10.R3 · Configuration Generator
+          ApexTopology v0.9.30 · Nokia SR OS 25.10.R3 · Configuration Generator
         </span>
         <div style={{ display: "flex", gap: 8 }}>
           <div style={{ width: 6, height: 6, borderRadius: "50%", background: G.accent2, animation: "pulse 2s infinite" }} />
