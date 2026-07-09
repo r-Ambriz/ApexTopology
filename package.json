@@ -1,6 +1,6 @@
 {
   "name": "apextopology",
-  "version": "0.9.10",
+  "version": "0.9.20",
   "description": "Nokia SR OS configuration template generator for Containerlab",
   "private": true,
   "scripts": {

@@ -51,7 +51,7 @@ const css = `
 `;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-const NODE_TYPES = ["7750SR", "7250IXR", "7950XRS", "7210SAS", "7705SAR", "7450ESS", "7750DMS", "VSR", "SR Linux", "Linux"];
+const NODE_TYPES = ["7750SR", "7250IXR", "7950XRS", "7705SAR", "7450ESS", "7750DMS", "VSR", "SR Linux", "Linux"];
 const IGP_OPTIONS = ["OSPF", "ISIS", "None"];
 const BGP_ROLES = ["IBGP Route Reflector", "IBGP Peer", "EBGP Peer", "None"];
 const SERVICE_TYPES = ["VPRN", "L3VPN", "VPLS", "Epipe", "EVPN-VPWS", "EVPN-VXLAN", "IES", "None"];
@@ -1110,7 +1110,6 @@ const PLATFORM_CHASSIS_MATCHERS = {
   "7750SR": chassis => chassis.startsWith("SR-"),
   "7950XRS": chassis => chassis.startsWith("XRS-"),
   "VSR": chassis => chassis.startsWith("VSR-"),
-  "7210SAS": () => false,
   "SR Linux": () => false,
   "Linux": () => false,
 };
@@ -1157,6 +1156,23 @@ function chassisIsIntegrated(node) {
   return !(hw.iomCardTypes || []).some(v => v && v !== "None");
 }
 
+// Line-card (IOM) slot counts for modular chassis; anything else is fixed (1).
+const IOM_SLOTS = {
+  "SR-7": 5, "SR-7s": 6, "SR-12": 10, "SR-12e": 10, "SR-14s": 12,
+  "SR-2s": 2, "SR-2se": 2, "SR-a4SR-a8": 8, "XRS-20XRS-20e": 20,
+  "ESS-7": 5, "ESS-12": 10, "IXR-6": 6, "IXR-10": 10,
+};
+// MDA bays for integrated pizza-boxes (distributed line cards default to 2).
+const INTEGRATED_MDA = { "SR-1": 2, "SAR-Hm": 1, "SAR-Hmc": 1, "IXR-e2": 1, "IXR-e2c": 1, "IXR-ec": 1 };
+
+// Max line cards per node and MDAs per card, so the UI can't add impossible hardware.
+function hwLimits(node) {
+  const model = chassisModelOf(node);
+  if (!model) return { maxCards: 12, maxMdas: 2 };            // no chassis chosen -> permissive
+  if (chassisIsIntegrated(node)) return { maxCards: 1, maxMdas: INTEGRATED_MDA[model] || 1 };
+  return { maxCards: IOM_SLOTS[model] || 1, maxMdas: 2 };     // distributed
+}
+
 // Breakout-capable connector families named in an MDA type (e.g. "…qsfp28").
 function connectorFamilies(mdaType) {
   const s = String(mdaType || "").toLowerCase();
@@ -1194,12 +1210,14 @@ function mdaTypeForPort(node, portName) {
 // Hardware default: one line card in slot 1 with one MDA in slot 1, no CPM/SFM.
 const defaultCards = () => [{ slot: "1", type: "None", mdas: [{ slot: "1", type: "None" }] }];
 
-const defaultNode = (id) => ({
+// `id` is a stable React key (never reused); `num` drives the display name and
+// default IPs (reused so numbering fills gaps after deletes).
+const defaultNode = (id, num = id) => ({
   id,
-  name: `NODE${id}`,
+  name: `NODE${num}`,
   type: "7750SR",
   chassisModel: "None",
-  systemIp: `10.0.0.${id}/32`,
+  systemIp: `10.0.0.${num}/32`,
   includeSystem: true,
   cpms: [],
   cards: defaultCards(),
@@ -1219,8 +1237,17 @@ const defaultNode = (id) => ({
   service: "None",
   customerId: "",
   rdRt: "",
-  interfaces: [{ name: "1/1/c1/1", ip: `192.168.${id}.1/30`, role: "network", breakout: "None", ifaceName: "" }],
+  interfaces: [{ name: "1/1/c1/1", ip: `192.168.${num}.1/30`, role: "network", breakout: "None", ifaceName: "" }],
 });
+
+// Smallest NODE number (>=1) not currently used, so re-adds fill the gap.
+const nextNodeNumber = (list) => {
+  const used = new Set();
+  (list || []).forEach(n => { const m = /^NODE(\d+)$/i.exec(n.name || ""); if (m) used.add(parseInt(m[1], 10)); });
+  let i = 1;
+  while (used.has(i)) i++;
+  return i;
+};
 
 const defaultLink = (id) => ({
   id,
@@ -1374,6 +1401,7 @@ function NodeEditor({ node, onChange, onDelete, index }) {
   const chassisOptions = chassisOptionsForPlatform(node.type);
   const hardwareOptions = hardwareOptionsForNode(node);
   const integrated = chassisIsIntegrated(node);
+  const limits = hwLimits(node);
   // Changing platform/chassis invalidates prior card selections -> reset to a clean default.
   const setPlatform = (type) => onChange({ ...node, type, chassisModel: "None", cpms: [], cards: defaultCards() });
   const setChassisModel = (chassisModel) => onChange({ ...node, chassisModel, cpms: [], cards: defaultCards() });
@@ -1455,8 +1483,8 @@ function NodeEditor({ node, onChange, onDelete, index }) {
               </>
             )}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: integrated ? 0 : 4 }}>
-              <Label>{integrated ? "MDAs (fixed card 1)" : "Line Cards (IOM) + MDAs"}</Label>
-              {!integrated && <Btn onClick={addCard} variant="ghost" style={{ padding: "3px 10px", fontSize: 11 }}>+ CARD</Btn>}
+              <Label>{integrated ? "MDAs (fixed card 1)" : `Line Cards (IOM) + MDAs · max ${limits.maxCards}`}</Label>
+              {!integrated && <Btn onClick={addCard} disabled={cards.length >= limits.maxCards} variant="ghost" style={{ padding: "3px 10px", fontSize: 11 }}>+ CARD</Btn>}
             </div>
             {integrated && <div style={{ fontSize: 11, color: G.textMuted }}>Integrated chassis — MDAs only.</div>}
             {(integrated ? cards.slice(0, 1) : cards).map((card, ci) => (
@@ -1475,8 +1503,9 @@ function NodeEditor({ node, onChange, onDelete, index }) {
                     <Btn onClick={() => delMda(ci, mi)} variant="danger" style={{ padding: "3px 8px", fontSize: 11 }}>✕</Btn>
                   </div>
                 ))}
-                <div style={{ paddingLeft: integrated ? 0 : 18 }}>
-                  <Btn onClick={() => addMda(ci)} variant="ghost" style={{ padding: "2px 10px", fontSize: 11 }}>+ MDA</Btn>
+                <div style={{ paddingLeft: integrated ? 0 : 18, display: "flex", alignItems: "center", gap: 8 }}>
+                  <Btn onClick={() => addMda(ci)} disabled={(card.mdas || []).length >= limits.maxMdas} variant="ghost" style={{ padding: "2px 10px", fontSize: 11 }}>+ MDA</Btn>
+                  <span style={{ fontSize: 10, color: G.textMuted, fontFamily: "'JetBrains Mono',monospace" }}>max {limits.maxMdas}</span>
                 </div>
               </div>
             ))}
@@ -1984,7 +2013,7 @@ function App() {
   const nodeId = useRef(3);
   const linkId = useRef(2);
 
-  const addNode = () => { setNodes(p => [...p, defaultNode(nodeId.current++)]); };
+  const addNode = () => { setNodes(p => [...p, defaultNode(nodeId.current++, nextNodeNumber(p))]); };
   const delNode = (i) => setNodes(p => p.filter((_, j) => j !== i));
   const updNode = (i, n) => setNodes(p => p.map((x, j) => j === i ? n : x));
   const addLink = () => { setLinks(p => [...p, defaultLink(linkId.current++)]); };
@@ -2047,7 +2076,7 @@ function App() {
           <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 20, fontWeight: 700, color: G.accent, letterSpacing: 2 }}>
             ApexTopology
           </div>
-          <div style={{ fontSize: 10, color: G.textMuted, letterSpacing: 2, fontFamily: "'JetBrains Mono',monospace" }}>Nokia SR OS Configuration Generator v0.9.10</div>
+          <div style={{ fontSize: 10, color: G.textMuted, letterSpacing: 2, fontFamily: "'JetBrains Mono',monospace" }}>Nokia SR OS Configuration Generator v0.9.20</div>
         </div>
         <div style={{ marginLeft: "auto", display: "flex", gap: 10, alignItems: "center" }}>
           <Badge color={G.accent}>ContainerLAB</Badge>
@@ -2221,7 +2250,7 @@ function App() {
       {/* Footer */}
       <div style={{ background: G.panel, borderTop: `1px solid ${G.border}`, padding: "8px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <span style={{ fontSize: 11, color: G.textMuted, fontFamily: "'JetBrains Mono',monospace" }}>
-          ApexTopology v0.9.10 · Nokia SR OS 25.10.R3 · Configuration Generator
+          ApexTopology v0.9.20 · Nokia SR OS 25.10.R3 · Configuration Generator
         </span>
         <div style={{ display: "flex", gap: 8 }}>
           <div style={{ width: 6, height: 6, borderRadius: "50%", background: G.accent2, animation: "pulse 2s infinite" }} />
